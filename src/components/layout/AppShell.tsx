@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { TaskBottomBar } from "@/components/task/TaskBottomBar";
 import type { PageId } from "@/types";
 
 export const NAV_ITEMS: {
@@ -108,8 +109,11 @@ export function AppShell({ page, onNavigate, children }: AppShellProps) {
         </div>
       </aside>
 
-      {/* 主内容区 */}
-      <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
+      {/* 主内容区：中间主操作区 + 底部固定任务栏（三栏布局） */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+        <TaskBottomBar />
+      </div>
     </div>
   );
 }

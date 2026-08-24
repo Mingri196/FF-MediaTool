@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { BatchPage } from "@/pages/BatchPage";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import { FirstRunDialog } from "@/components/ffmpeg/FirstRunDialog";
 import { I18nProvider, useI18n } from "@/i18n";
 import { SettingsProvider, useSettings } from "@/settings/SettingsProvider";
+import { TaskProvider } from "@/tasks/TaskProvider";
 import { applyAccent, applyThemeMode } from "@/theme/theme";
 import { api } from "@/lib/tauri";
 import type { Language, PageId } from "@/types";
@@ -43,14 +45,32 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.hasCompletedFirstRun]);
 
+  // 记录最近输入目录（快速任务对话框派发的事件）
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const dir = (e as CustomEvent<string>).detail;
+      if (dir && settings && dir !== settings.lastInputDir) {
+        update({ lastInputDir: dir });
+      }
+    };
+    window.addEventListener("ffmt:last-input-dir", handler);
+    return () => window.removeEventListener("ffmt:last-input-dir", handler);
+  }, [settings, update]);
+
   const handleFirstRunDone = () => {
     setShowFirstRun(false);
     update({ hasCompletedFirstRun: true });
   };
 
   const main = useMemo(() => {
-    if (page === "settings") return <SettingsPage />;
-    return <PlaceholderPage />;
+    switch (page) {
+      case "settings":
+        return <SettingsPage />;
+      case "batch":
+        return <BatchPage />;
+      default:
+        return <PlaceholderPage />;
+    }
   }, [page]);
 
   return (
@@ -85,10 +105,10 @@ function Inner() {
     );
   }
   return (
-    <>
+    <TaskProvider>
       <Shell />
       <Toaster position="bottom-right" richColors closeButton />
-    </>
+    </TaskProvider>
   );
 }
 
