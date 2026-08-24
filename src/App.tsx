@@ -3,6 +3,8 @@ import { Toaster } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { BatchPage } from "@/pages/BatchPage";
+import { VideoConvertPage } from "@/pages/VideoConvertPage";
+import { VideoClipPage } from "@/pages/VideoClipPage";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import { FirstRunDialog } from "@/components/ffmpeg/FirstRunDialog";
 import { I18nProvider, useI18n } from "@/i18n";
@@ -63,15 +65,19 @@ function Shell() {
   };
 
   const main = useMemo(() => {
-    switch (page) {
-      case "settings":
-        return <SettingsPage />;
-      case "batch":
-        return <BatchPage />;
-      default:
-        return <PlaceholderPage />;
-    }
-  }, [page]);
+      switch (page) {
+        case "settings":
+          return <SettingsPage />;
+        case "batch":
+          return <BatchPage />;
+        case "video-convert":
+          return <VideoConvertPage />;
+        case "video-clip":
+          return <VideoClipPage />;
+        default:
+          return <PlaceholderPage />;
+      }
+    }, [page]);
 
   return (
     <>

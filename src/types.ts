@@ -45,3 +45,30 @@ export interface FfmpegStatus {
   ffprobe: BinaryInfo | null;
   manualInvalid: boolean;
 }
+
+/** 媒体基础信息（模块三：转换/剪辑页用；模块五做全量） */
+export interface StreamSummary {
+  index: number;
+  codecType: string;
+  codecName: string;
+  width: number | null;
+  height: number | null;
+  sampleRate: number | null;
+  channels: number | null;
+}
+
+export interface MediaBasicInfo {
+  durationMs: number;
+  hasVideo: boolean;
+  hasAudio: boolean;
+  streams: StreamSummary[];
+  ok: boolean;
+  error: string | null;
+}
+
+export interface CropDetect {
+  w: number;
+  h: number;
+  x: number;
+  y: number;
+}

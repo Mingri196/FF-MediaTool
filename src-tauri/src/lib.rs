@@ -1,4 +1,5 @@
 mod ffmpeg;
+mod media;
 mod settings;
 mod task;
 mod util;
@@ -27,8 +28,10 @@ pub fn run() {
             settings::get_settings,
             settings::save_settings,
             ffmpeg::detect_ffmpeg,
-            ffmpeg::validate_ffmpeg_paths,
-            task::task_add,
+                            ffmpeg::validate_ffmpeg_paths,
+                            media::media_probe_basic,
+                            media::detect_crop,
+                            task::task_add,
             task::task_stop,
             task::task_remove,
             task::task_reorder,
