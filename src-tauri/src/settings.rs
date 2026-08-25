@@ -188,3 +188,12 @@ pub fn open_opt_dir(app: AppHandle) -> Result<(), String> {
     { let _ = std::process::Command::new("open").arg(&opt).spawn(); }
     Ok(())
 }
+
+/// 返回应用根目录 opt 文件夹的路径
+#[tauri::command]
+pub fn get_opt_dir(app: AppHandle) -> Result<String, String> {
+    let resource = app.path().resource_dir().map_err(|e| format!("无法获取资源目录: {e}"))?;
+    let opt = resource.join("opt");
+    std::fs::create_dir_all(&opt).map_err(|e| format!("无法创建 opt 目录: {e}"))?;
+    Ok(opt.to_string_lossy().to_string())
+}

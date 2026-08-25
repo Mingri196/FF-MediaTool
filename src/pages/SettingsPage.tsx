@@ -36,6 +36,12 @@ export function SettingsPage() {
   const setLang = (lang: Language) => update({ language: lang });
   const setTheme = (theme: ThemeMode) => update({ theme });
 
+  const resetDefault = () => {
+    if (confirm(t("settings.outputPath.resetConfirm"))) {
+      setLocalPaths({ videoConvert: null, audioConvert: null, imageConvert: null, videoClip: null });
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl space-y-5 p-6">
@@ -107,6 +113,7 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={resetDefault}>{t("settings.outputPath.resetDefault")}</Button>
                   <Button variant="outline" size="sm" onClick={() => { setLocalPaths({ ...settings.outputPaths }); }}>{t("settings.outputPath.cancel")}</Button>
                   <Button size="sm" onClick={() => { update({ outputPaths: localPaths }); }}>{t("settings.outputPath.save")}</Button>
                 </div>
@@ -220,7 +227,7 @@ export function SettingsPage() {
 
         {/* 页脚版本信息 */}
         <div className="flex items-center justify-between pb-4 pt-1 text-xs text-muted-foreground">
-          <span>FF-MediaTool v0.43</span>
+          <span>FF-MediaTool v0.44</span>
           <Badge variant="outline">Tauri 2 + React + Rust</Badge>
         </div>
       </div>

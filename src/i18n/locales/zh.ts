@@ -83,6 +83,8 @@ export const zh = {
   "settings.outputPath.videoClip": "视频剪辑输出路径",
   "settings.outputPath.save": "保存",
   "settings.outputPath.cancel": "取消",
+  "settings.outputPath.resetDefault": "恢复默认",
+  "settings.outputPath.resetConfirm": "确认清空所有自定义输出路径，恢复为全局默认目录？",
 
   /* ---------- 预设管理 ---------- */
   "settings.presets.title": "编码预设模板",

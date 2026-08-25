@@ -60,9 +60,10 @@ export function VideoClipPage() {
     });
     if (typeof picked !== "string" || !picked) return;
     setInput(picked);
-    // 使用默认输出路径，不跟随输入目录
-    const defaultDir = settings?.outputPaths?.videoClip ?? "";
-    const baseInput = defaultDir ? defaultDir + "/" + basename(picked) : picked;
+    // 使用默认输出路径，不跟随输入目录；空路径回落 opt
+    const cfgDir = settings?.outputPaths?.videoClip;
+    const defaultDir = cfgDir || (await api.getOptDir());
+    const baseInput = defaultDir + "/" + basename(picked);
     setOutput(deriveOutputPath(baseInput, "mp4"));
     const dir = picked.replace(/[\\/][^\\/]+$/, "");
     window.dispatchEvent(new CustomEvent("ffmt:last-input-dir", { detail: dir }));

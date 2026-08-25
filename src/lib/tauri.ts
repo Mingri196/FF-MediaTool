@@ -7,6 +7,7 @@ export const api = {
   saveSettings: (settings: AppSettings) =>
     invoke<AppSettings>("save_settings", { settings }),
   openOptDir: () => invoke<void>("open_opt_dir"),
+  getOptDir: () => invoke<string>("get_opt_dir"),
   detectFfmpeg: () => invoke<FfmpegStatus>("detect_ffmpeg"),
   validateFfmpegPaths: (ffmpegPath: string | null, ffprobePath: string | null) =>
     invoke<FfmpegStatus>("validate_ffmpeg_paths", { ffmpegPath, ffprobePath }),

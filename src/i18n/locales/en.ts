@@ -82,6 +82,8 @@ export const en: Record<I18nKey, string> = {
   "settings.outputPath.videoClip": "Video Clip Output Path",
   "settings.outputPath.save": "Save",
   "settings.outputPath.cancel": "Cancel",
+  "settings.outputPath.resetDefault": "Reset to Default",
+  "settings.outputPath.resetConfirm": "Clear all custom output paths and restore global defaults?",
 
   /* ---------- Presets ---------- */
   "settings.presets.title": "Encode Presets",

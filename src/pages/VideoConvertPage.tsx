@@ -79,9 +79,10 @@ export function VideoConvertPage() {
       if (dir !== lastOutputDir) {
         window.dispatchEvent(new CustomEvent("ffmt:last-input-dir", { detail: dir }));
       }
-      // 自动生成输出（使用默认输出路径，不跟随输入目录）
-      const defaultDir = settings?.outputPaths?.videoConvert ?? "";
-      const baseInput = defaultDir ? joinPath(defaultDir, basename(picked)) : picked;
+      // 自动生成输出（使用默认输出路径，不跟随输入目录；空路径回落 opt）
+      const cfgDir = settings?.outputPaths?.videoConvert;
+      const defaultDir = cfgDir || (await api.getOptDir());
+      const baseInput = joinPath(defaultDir, basename(picked));
       setOutput(deriveOutputPath(baseInput, format));
       // 读取媒体信息
       setProbing(true);

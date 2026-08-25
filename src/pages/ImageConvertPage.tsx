@@ -14,6 +14,7 @@ import { DropZone } from "@/components/shared/DropZone";
 import { useI18n } from "@/i18n";
 import { useTasks } from "@/tasks/TaskProvider";
 import { useSettings } from "@/settings/SettingsProvider";
+import { api } from "@/lib/tauri";
 import { buildImageArgs, genOutputPath } from "@/image/builder";
 import { defaultImageParams, IMAGE_OUTPUT_FORMATS, type ImageFileItem, type ImageParams } from "@/image/types";
 import { INPUT_IMAGE_EXTS, getPreset, applyFormatDefaults } from "@/image/formatPresets";
@@ -124,10 +125,12 @@ export function ImageConvertPage() {
   };
   const clearFiles = () => { setFiles([]); setSelected(new Set()); };
 
-  // 输出目录从设置同步
+  // 输出目录从设置同步；空路径回落 opt
   useEffect(() => {
-    const imgPath = settings?.outputPaths?.imageConvert;
-    if (imgPath) setParams((p) => ({ ...p, outputDir: imgPath }));
+    (async () => {
+      const imgPath = settings?.outputPaths?.imageConvert || (await api.getOptDir());
+      if (imgPath) setParams((p) => ({ ...p, outputDir: imgPath }));
+    })();
   }, [settings?.outputPaths?.imageConvert]);
 
   // 单张选中时自动填充宽高，多图/无图时清空

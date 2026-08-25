@@ -90,9 +90,10 @@ export function AudioConvertPage() {
     setInput(picked);
     const dir = picked.replace(/[\\/][^\\/]+$/, "");
     window.dispatchEvent(new CustomEvent("ffmt:last-input-dir", { detail: dir }));
-    // 使用默认输出路径，不跟随输入目录
-    const defaultDir = settings?.outputPaths?.audioConvert ?? "";
-    const baseInput = defaultDir ? defaultDir + "/" + basename(picked) : picked;
+    // 使用默认输出路径，不跟随输入目录；空路径回落 opt
+    const cfgDir = settings?.outputPaths?.audioConvert;
+    const defaultDir = cfgDir || (await api.getOptDir());
+    const baseInput = defaultDir + "/" + basename(picked);
     setOutput(deriveOutputPath(baseInput, format));
     try {
       const info = await api.mediaProbeBasic(picked);
