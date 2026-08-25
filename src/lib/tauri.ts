@@ -23,3 +23,5 @@ export const api = {
   validateTaskArgs: (input: string, output: string, vcodec?: string | null, acodec?: string | null, hasVf?: boolean, hasAf?: boolean) =>
     invoke<ValidationResult>("validate_task_args", { input, output, vcodec: vcodec ?? null, acodec: acodec ?? null, hasVf: hasVf ?? false, hasAf: hasAf ?? false }),
 };
+
+export { invoke };

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ImagePlus, Trash2, Play, RotateCw, FlipHorizontal, FlipVertical, Crop, Palette, Expand } from "lucide-react";
+import { ImagePlus, FolderOpen, Trash2, Play, RotateCw, FlipHorizontal, FlipVertical, Crop, Palette, Expand } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,10 @@ import { buildImageArgs, genOutputPath } from "@/image/builder";
 import { defaultImageParams, IMAGE_OUTPUT_FORMATS, type ImageFileItem, type ImageParams } from "@/image/types";
 import { INPUT_IMAGE_EXTS, getPreset, applyFormatDefaults } from "@/image/formatPresets";
 import { basename } from "@/lib/format";
+import { invoke } from "@/lib/tauri";
 
-const RESIZE_MODES = ["none", "percent", "fitWidth", "fitHeight", "fixed", "fill", "contain", "cover"] as const;
+const RESIZE_MODES = ["none", "percent", "fitWidth", "fitHeight", "fixed", "custom", "fill", "contain", "cover"] as const;
+const ADAPT_MODES = ["fill", "contain", "cover"] as const;
 const ASPECT_RATIOS = ["free", "1:1", "16:9", "4:3", "3:2", "21:9"];
 
 export function ImageConvertPage() {
@@ -41,7 +43,29 @@ export function ImageConvertPage() {
       const name = p.split(/[\\/]/).pop() ?? "";
       return { path: p, name, size: 0, ext: p.split(".").pop()?.toLowerCase() ?? "" };
     });
-    setFiles((prev) => [...prev, ...newItems]);
+    if (newItems.length > 0) setFiles((prev) => [...prev, ...newItems]);
+  }, [files, t]);
+
+  const addFolder = useCallback(async () => {
+    const dir = await open({ directory: true, multiple: false, title: t("img.addFolder") });
+    if (!dir || typeof dir !== "string") return;
+    try {
+      const paths: string[] = await invoke("scan_directory", { path: dir });
+      if (paths.length === 0) {
+        const { toast } = await import("sonner");
+        toast.error(t("img.folderEmpty"));
+        return;
+      }
+      const existing = new Set(files.map((f) => f.path));
+      const newItems: ImageFileItem[] = paths.filter((p) => !existing.has(p)).map((p) => {
+        const name = p.split(/[\\/]/).pop() ?? "";
+        return { path: p, name, size: 0, ext: p.split(".").pop()?.toLowerCase() ?? "" };
+      });
+      if (newItems.length > 0) setFiles((prev) => [...prev, ...newItems]);
+    } catch (err) {
+      const { toast } = await import("sonner");
+      toast.error(t("img.folderEmpty"));
+    }
   }, [files, t]);
 
   const removeFile = (idx: number) => setFiles((prev) => prev.filter((_, i) => i !== idx));
@@ -50,12 +74,10 @@ export function ImageConvertPage() {
   const formatPreset = useMemo(() => getPreset(params.format), [params.format]);
   const isLossless = params.lossless;
 
-  /** 格式切换自动应用默认参数 */
   const changeFormat = (fmt: string) => {
     setParams(applyFormatDefaults(params, fmt as ImageParams["format"]));
   };
 
-  /** 批量转换 */
   const startBatch = () => {
     if (files.length === 0) return;
     setProcessing(true);
@@ -74,7 +96,6 @@ export function ImageConvertPage() {
   };
 
   const sliderVal = (v: number | readonly number[]) => (Array.isArray(v) ? v[0] ?? 0 : v);
-
   const disabled = isLossless;
 
   return (
@@ -93,6 +114,7 @@ export function ImageConvertPage() {
                 <CardTitle className="text-base">{t("img.fileList")}</CardTitle>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">{t("img.fileCount", { count: files.length })}</span>
+                  <Button variant="outline" size="sm" onClick={() => void addFolder()}><FolderOpen className="size-4" />{t("img.addFolder")}</Button>
                   <Button variant="outline" size="sm" onClick={() => void addFiles()}><ImagePlus className="size-4" />{t("img.addFiles")}</Button>
                   {files.length > 0 && <Button variant="ghost" size="sm" onClick={clearFiles}><Trash2 className="size-4" />{t("img.clearAll")}</Button>}
                 </div>
@@ -129,21 +151,18 @@ export function ImageConvertPage() {
                 </SelectContent>
               </Select>
 
-              {/* 格式专属参数 */}
               <div className="space-y-3 rounded-md border p-4">
                 <div className="flex items-center gap-3">
                   <Checkbox id="lossless" checked={isLossless} onCheckedChange={(v) => setParams({ ...params, lossless: v === true })} />
                   <Label htmlFor="lossless">{t("img.losslessMode")}</Label>
                   <span className="text-xs text-muted-foreground">{t("img.losslessHint")}</span>
                 </div>
-
                 {formatPreset.supportsQuality && !isLossless && (
                   <div className="space-y-1.5">
                     <Label>{t("img.quality")}: {params.quality}</Label>
                     <Slider min={1} max={100} step={1} value={[params.quality]} onValueChange={(v) => setParams({ ...params, quality: Math.round(sliderVal(v)) })} />
                   </div>
                 )}
-
                 {params.format === "jpg" && !isLossless && (
                   <>
                     <div className="flex items-center gap-2">
@@ -161,21 +180,18 @@ export function ImageConvertPage() {
                     </Select>
                   </>
                 )}
-
                 {params.format === "png" && (
                   <div className="space-y-1.5">
                     <Label>{t("img.compression")}: {params.compressionLevel}</Label>
                     <Slider min={0} max={9} step={1} value={[params.compressionLevel]} onValueChange={(v) => setParams({ ...params, compressionLevel: Math.round(sliderVal(v)) })} />
                   </div>
                 )}
-
                 {params.format === "webp" && (
                   <div className="space-y-1.5">
                     <Label>{t("img.webpSpeed")}: {params.webpSpeed}</Label>
                     <Slider min={0} max={6} step={1} value={[params.webpSpeed]} onValueChange={(v) => setParams({ ...params, webpSpeed: Math.round(sliderVal(v)) })} />
                   </div>
                 )}
-
                 {params.format === "avif" && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
@@ -191,21 +207,11 @@ export function ImageConvertPage() {
                     </Select>
                   </div>
                 )}
-
                 {params.format === "gif" && (
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label>{t("img.gifFps")}: {params.gifFps}</Label>
-                      <Slider min={1} max={60} step={1} value={[params.gifFps]} onValueChange={(v) => setParams({ ...params, gifFps: Math.round(sliderVal(v)) })} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>{t("img.gifLoop")}: {params.gifLoop}</Label>
-                      <Slider min={0} max={100} step={1} value={[params.gifLoop]} onValueChange={(v) => setParams({ ...params, gifLoop: Math.round(sliderVal(v)) })} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>{t("img.gifColors")}: {params.gifColors}</Label>
-                      <Slider min={2} max={256} step={1} value={[params.gifColors]} onValueChange={(v) => setParams({ ...params, gifColors: Math.round(sliderVal(v)) })} />
-                    </div>
+                    <div className="space-y-1.5"><Label>{t("img.gifFps")}: {params.gifFps}</Label><Slider min={1} max={60} step={1} value={[params.gifFps]} onValueChange={(v) => setParams({ ...params, gifFps: Math.round(sliderVal(v)) })} /></div>
+                    <div className="space-y-1.5"><Label>{t("img.gifLoop")}: {params.gifLoop}</Label><Slider min={0} max={100} step={1} value={[params.gifLoop]} onValueChange={(v) => setParams({ ...params, gifLoop: Math.round(sliderVal(v)) })} /></div>
+                    <div className="space-y-1.5"><Label>{t("img.gifColors")}: {params.gifColors}</Label><Slider min={2} max={256} step={1} value={[params.gifColors]} onValueChange={(v) => setParams({ ...params, gifColors: Math.round(sliderVal(v)) })} /></div>
                   </div>
                 )}
               </div>
@@ -218,20 +224,53 @@ export function ImageConvertPage() {
               <div className="space-y-1.5">
                 <Label>{t("img.resizeMode")}</Label>
                 <Select value={params.resize.mode} onValueChange={(v) => v !== null && setParams({ ...params, resize: { ...params.resize, mode: v as ImageParams["resize"]["mode"] } })} disabled={disabled}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full"><SelectValue placeholder={t(`img.resize.${params.resize.mode}`)} /></SelectTrigger>
                   <SelectContent>
                     {RESIZE_MODES.map((m) => <SelectItem key={m} value={m}>{t(`img.resize.${m}`)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              {params.resize.mode !== "none" && <div className="space-y-1.5">
-                <Label>{t("img.resizeValue")}</Label>
-                <Input type="number" value={params.resize.value} onChange={(e) => setParams({ ...params, resize: { ...params.resize, value: Number(e.target.value) } })} disabled={disabled} />
-              </div>}
-              {["fixed", "fill", "contain", "cover"].includes(params.resize.mode) && <div className="space-y-1.5">
-                <Label>{t("img.resizeValue2")}</Label>
-                <Input type="number" value={params.resize.value2} onChange={(e) => setParams({ ...params, resize: { ...params.resize, value2: Number(e.target.value) } })} disabled={disabled} />
-              </div>}
+
+              {params.resize.mode === "custom" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>{t("img.width")} (px)</Label>
+                    <Input type="number" min={16} max={8192} value={params.resize.value || ""} onChange={(e) => {
+                      const v = Math.max(16, Math.min(8192, Number(e.target.value) || 0));
+                      setParams({ ...params, resize: { ...params.resize, value: v } });
+                    }} disabled={disabled} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("img.height")} (px)</Label>
+                    <Input type="number" min={16} max={8192} value={params.resize.value2 || ""} onChange={(e) => {
+                      const v = Math.max(16, Math.min(8192, Number(e.target.value) || 0));
+                      setParams({ ...params, resize: { ...params.resize, value2: v } });
+                    }} disabled={disabled} />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>{t("img.resizeMode")}</Label>
+                    <Select value={params.resize.adaptMode} onValueChange={(v) => v !== null && setParams({ ...params, resize: { ...params.resize, adaptMode: v as "fill" | "contain" | "cover" } })}>
+                      <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {ADAPT_MODES.map((m) => <SelectItem key={m} value={m}>{t(`img.resize.${m}`)}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+
+              {params.resize.mode !== "none" && params.resize.mode !== "custom" && (
+                <div className="space-y-1.5">
+                  <Label>{t("img.resizeValue")}</Label>
+                  <Input type="number" value={params.resize.value} onChange={(e) => setParams({ ...params, resize: { ...params.resize, value: Number(e.target.value) } })} disabled={disabled} />
+                </div>
+              )}
+              {["fixed", "fill", "contain", "cover"].includes(params.resize.mode) && (
+                <div className="space-y-1.5">
+                  <Label>{t("img.resizeValue2")}</Label>
+                  <Input type="number" value={params.resize.value2} onChange={(e) => setParams({ ...params, resize: { ...params.resize, value2: Number(e.target.value) } })} disabled={disabled} />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>{t("img.dpi")}</Label>
                 <Input type="number" value={params.resize.dpi} onChange={(e) => setParams({ ...params, resize: { ...params.resize, dpi: Number(e.target.value) } })} />
@@ -242,13 +281,10 @@ export function ImageConvertPage() {
           {/* 编辑处理 */}
           <CollapsibleCard title={t("img.sectionEdit")} icon={<Palette className="size-4" />}>
             <div className="space-y-5">
-              {/* 旋转翻转 */}
               <div className="flex flex-wrap items-center gap-2">
                 <Label>{t("img.rotate")}</Label>
                 {[0, 90, 180, 270].map((a) => (
-                  <Button key={a} variant={params.rotate === a ? "default" : "outline"} size="sm" onClick={() => setParams({ ...params, rotate: a as 0 | 90 | 180 | 270 })} disabled={disabled}>
-                    {a}°
-                  </Button>
+                  <Button key={a} variant={params.rotate === a ? "default" : "outline"} size="sm" onClick={() => setParams({ ...params, rotate: a as 0 | 90 | 180 | 270 })} disabled={disabled}>{a}°</Button>
                 ))}
                 <div className="ml-2 flex gap-1">
                   <Button variant={params.flipH ? "default" : "outline"} size="icon" className="size-8" onClick={() => setParams({ ...params, flipH: !params.flipH })} disabled={disabled} title={t("img.flipH")}>
@@ -260,7 +296,6 @@ export function ImageConvertPage() {
                 </div>
               </div>
 
-              {/* 裁剪 */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Crop className="size-4 text-muted-foreground" />
@@ -283,7 +318,6 @@ export function ImageConvertPage() {
                 )}
               </div>
 
-              {/* 色彩 */}
               <div className="space-y-3">
                 <Label>{t("img.brightness")}: {params.color.brightness.toFixed(2)}</Label>
                 <Slider min={-1} max={1} step={0.05} value={[params.color.brightness]} onValueChange={(v) => setParams({ ...params, color: { ...params.color, brightness: sliderVal(v) } })} disabled={disabled} />
@@ -293,7 +327,6 @@ export function ImageConvertPage() {
                 <Slider min={0} max={3} step={0.05} value={[params.color.saturation]} onValueChange={(v) => setParams({ ...params, color: { ...params.color, saturation: sliderVal(v) } })} disabled={disabled} />
               </div>
 
-              {/* 画布 */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Expand className="size-4 text-muted-foreground" />
@@ -311,7 +344,7 @@ export function ImageConvertPage() {
             </div>
           </CollapsibleCard>
 
-          {/* 输出设置 */}
+          {/* 输出设置（修复：Select 显示用中文标签而非内部值） */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">{t("img.sectionOutput")}</CardTitle>
@@ -327,7 +360,9 @@ export function ImageConvertPage() {
               <div className="space-y-1.5">
                 <Label>{t("img.onConflict")}</Label>
                 <Select value={params.onConflict} onValueChange={(v) => v !== null && setParams({ ...params, onConflict: v as ImageParams["onConflict"] })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full">
+                    <span>{t(`img.conflict.${params.onConflict}`)}</span>
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="overwrite">{t("img.conflict.overwrite")}</SelectItem>
                     <SelectItem value="autoNumber">{t("img.conflict.autoNumber")}</SelectItem>
@@ -348,7 +383,6 @@ export function ImageConvertPage() {
   );
 }
 
-/** 可折叠卡片容器 */
 function CollapsibleCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <Card>

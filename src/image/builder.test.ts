@@ -53,13 +53,13 @@ describe("buildImageArgs", () => {
   });
 
   it("等比缩放 50%", () => {
-    const args = build({ resize: { mode: "percent", value: 50, value2: 0, dpi: 72 } });
+    const args = build({ resize: { mode: "percent", value: 50, value2: 0, dpi: 72, adaptMode: "fill" } });
     const vf = args[args.indexOf("-vf") + 1];
     expect(vf).toContain("scale=iw*50/100:ih*50/100");
   });
 
   it("固定尺寸拉伸", () => {
-    const args = build({ resize: { mode: "fixed", value: 1920, value2: 1080, dpi: 72 } });
+    const args = build({ resize: { mode: "fixed", value: 1920, value2: 1080, dpi: 72, adaptMode: "fill" } });
     const vf = args[args.indexOf("-vf") + 1];
     expect(vf).toMatch(/scale=1920:1080/);
   });
@@ -91,7 +91,7 @@ describe("buildImageArgs", () => {
   it("完整滤镜链顺序", () => {
     const args = build({
       crop: { enabled: true, w: 100, h: 100, x: 0, y: 0, aspectRatio: "1:1" },
-      resize: { mode: "fitWidth", value: 800, value2: 0, dpi: 72 },
+      resize: { mode: "fitWidth", value: 800, value2: 0, dpi: 72, adaptMode: "fill" },
       rotate: 90,
       flipH: true,
       color: { brightness: 0, contrast: 1, saturation: 1.2 },

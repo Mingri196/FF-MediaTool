@@ -125,6 +125,14 @@ function buildScale(params: ImageParams): string | null {
       return `scale=-1:${resize.value}:flags=lanczos`;
     case "fixed":
       return `scale=${resize.value}:${resize.value2}:flags=lanczos:force_original_aspect_ratio=disable`;
+    case "custom": {
+      const w = Math.round(resize.value);
+      const h = Math.round(resize.value2);
+      if (resize.adaptMode === "fill") return `scale=${w}:${h}:flags=lanczos:force_original_aspect_ratio=disable`;
+      if (resize.adaptMode === "contain") return `scale='min(${w},iw)':'min(${h},ih)':flags=lanczos:force_original_aspect_ratio=1:pad=1:color=black`;
+      if (resize.adaptMode === "cover") return `scale=${w}:${h}:flags=lanczos:force_original_aspect_ratio=1,crop=${w}:${h}`;
+      return `scale=${w}:${h}:flags=lanczos:force_original_aspect_ratio=disable`;
+    }
     case "fill":
       return `scale=${resize.value}:${resize.value2}:flags=lanczos:force_original_aspect_ratio=1`;
     case "contain":

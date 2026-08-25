@@ -279,3 +279,31 @@ fn error_result(msg: &str) -> MediaFullInfo {
 fn empty_format() -> FormatInfo {
     FormatInfo { filename: String::new(), format_name: String::new(), format_long_name: String::new(), duration: 0.0, size: 0, bit_rate: None, start_time: 0.0, nb_streams: 0 }
 }
+
+const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif"];
+
+#[tauri::command]
+pub fn scan_directory(path: String) -> Result<Vec<String>, String> {
+    let mut results = Vec::new();
+    let dir = std::path::Path::new(&path);
+    if !dir.is_dir() {
+        return Err("路径不是文件夹".to_string());
+    }
+    scan_dir_recursive(dir, &mut results).map_err(|e| format!("扫描失败: {e}"))?;
+    Ok(results)
+}
+
+fn scan_dir_recursive(dir: &std::path::Path, results: &mut Vec<String>) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            scan_dir_recursive(&path, results)?;
+        } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            if IMAGE_EXTS.contains(&ext.to_lowercase().as_str()) {
+                results.push(path.to_string_lossy().to_string());
+            }
+        }
+    }
+    Ok(())
+}

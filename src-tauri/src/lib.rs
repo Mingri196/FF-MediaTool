@@ -32,6 +32,7 @@ pub fn run() {
                             media::media_probe_basic,
                             media::media_probe_full,
                             media::detect_crop,
+                            media::scan_directory,
                             task::task_add,
             task::task_stop,
             task::task_remove,
