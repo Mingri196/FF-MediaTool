@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/i18n";
 import { useTasks } from "@/tasks/TaskProvider";
 import { api } from "@/lib/tauri";
+import { DropZone } from "@/components/shared/DropZone";
 import { FileRow } from "@/components/shared/FileRow";
 import { basename, formatMs } from "@/lib/format";
 import type { MediaFullInfo } from "@/types";
@@ -66,8 +67,8 @@ export function MediaInfoPage() {
   const [metaEdit, setMetaEdit] = useState<Record<string, string>>({});
 
   /** 选文件 → 全量探测 */
-  const pickInput = useCallback(async () => {
-    const picked = await open({
+  const pickInput = useCallback(async (path?: string) => {
+    const picked = path ?? await open({
       multiple: false,
       directory: false,
       title: t("info.input"),
@@ -147,8 +148,9 @@ export function MediaInfoPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-4xl space-y-5 p-6">
+    <DropZone onFiles={([path]) => path && void pickInput(path)} className="h-full">
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-4xl space-y-5 p-6">
         <div>
           <h1 className="text-xl font-semibold">{t("info.title")}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{t("info.desc")}</p>
@@ -338,7 +340,8 @@ export function MediaInfoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DropZone>
   );
 }
 

@@ -1,17 +1,36 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { Trash2, Download, Pause, Play, Maximize2, Minimize2, GripHorizontal } from "lucide-react";
+import { Trash2, Download, Pause, Play, Maximize2, Minimize2, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { api } from "@/lib/tauri";
 import { isErrorLine } from "@/lib/ffmpegErrors";
 import type { LogEntry } from "@/tasks/types";
 
-const DEFAULT_HEIGHT = 120; // px
-const EXPANDED_MIN = 200;
-const EXPANDED_MAX = 600;
+const DEFAULT_WIDTH_KEY = "ffmt-log-width";
+const DEFAULT_WIDTH = 400;
+const MIN_WIDTH = 200;
+const MAX_WIDTH_PCT = 0.7;
+
+function loadWidth(): number {
+  try {
+    const v = localStorage.getItem(DEFAULT_WIDTH_KEY);
+    if (v) return Math.max(MIN_WIDTH, Math.min(window.innerWidth * MAX_WIDTH_PCT, Number(v)));
+  } catch { /* ignore */ }
+  return DEFAULT_WIDTH;
+}
 
 export function LogView({
   entries,
@@ -34,44 +53,62 @@ export function LogView({
   const setExpanded = onExpandedChange ?? setLocalExpanded;
 
   const [paused, setPaused] = useState(false);
-  const [logHeight, setLogHeight] = useState(DEFAULT_HEIGHT);
+  const [logWidth, setLogWidth] = useState(loadWidth);
+  const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef(false);
-  const startY = useRef(0);
-  const startH = useRef(0);
+  const startX = useRef(0);
+  const startW = useRef(0);
 
-  // 自动滚动到底部（除非暂停）
+  // 持久化宽度
+  const persistWidth = useCallback((w: number) => {
+    try { localStorage.setItem(DEFAULT_WIDTH_KEY, String(w)); } catch { /* ignore */ }
+  }, []);
+
+  // 自动滚动
   useEffect(() => {
     if (paused || !scrollRef.current) return;
     const el = scrollRef.current;
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-    if (isNearBottom) {
-      el.scrollTop = el.scrollHeight;
-    }
+    if (isNearBottom) el.scrollTop = el.scrollHeight;
   }, [entries, paused]);
 
-  // 拖拽调整高度
-  const onMouseDown = (e: React.MouseEvent) => {
+  // 拖拽调整宽度（右侧边缘）
+  const onResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
     dragRef.current = true;
-    startY.current = e.clientY;
-    startH.current = logHeight;
-    document.body.style.cursor = "row-resize";
+    startX.current = e.clientX;
+    startW.current = logWidth;
+    document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
-      const delta = ev.clientY - startY.current;
-      const next = Math.max(EXPANDED_MIN, Math.min(EXPANDED_MAX, startH.current + delta));
-      setLogHeight(next);
+      const delta = ev.clientX - startX.current;
+      const maxW = window.innerWidth * MAX_WIDTH_PCT;
+      const next = Math.max(MIN_WIDTH, Math.min(maxW, startW.current + delta));
+      setLogWidth(next);
     };
     const onUp = () => {
       dragRef.current = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      persistWidth(logWidth);
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
+  };
+
+  const handleClear = () => {
+    if (onClear) {
+      setConfirmClear(true);
+    }
+  };
+
+  const doClear = () => {
+    onClear?.();
+    setConfirmClear(false);
   };
 
   const exportLog = async () => {
@@ -90,11 +127,9 @@ export function LogView({
     }
   };
 
-  const height = expanded ? Math.max(EXPANDED_MIN, logHeight) : DEFAULT_HEIGHT;
-
   return (
-    <div className={cn("flex flex-col", className)}>
-      {/* 工具栏 */}
+    <div className={cn("flex flex-col relative", className)}>
+      {/* 工具栏 —— 按钮始终可见 */}
       <div className="flex shrink-0 items-center justify-between border-b border-border px-2 py-1">
         <span className="text-xs font-medium text-muted-foreground">
           {t("taskbar.log.title")}
@@ -103,52 +138,36 @@ export function LogView({
           )}
         </span>
         <div className="flex items-center gap-0.5">
-          {expanded && (
-            <>
-              <button
-                type="button"
-                className="cursor-row-resize rounded p-0.5 text-muted-foreground hover:bg-accent"
-                title={t("taskbar.log.resize")}
-                onMouseDown={onMouseDown}
-              >
-                <GripHorizontal className="size-3.5" />
-              </button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6"
-                disabled={entries.length === 0}
-                onClick={() => setPaused((p) => !p)}
-                title={paused ? t("taskbar.log.resume") : t("taskbar.log.pause")}
-              >
-                {paused ? <Play className="size-3" /> : <Pause className="size-3" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6"
-                disabled={entries.length === 0}
-                onClick={onClear}
-                title={t("taskbar.log.clear")}
-              >
-                <Trash2 className="size-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6"
-                disabled={entries.length === 0}
-                onClick={() => void exportLog()}
-                title={t("taskbar.log.export")}
-              >
-                <Download className="size-3" />
-              </Button>
-            </>
-          )}
+          {/* 暂停/继续 — 始终可见 */}
           <Button
-            variant="ghost"
-            size="icon"
-            className="size-6"
+            variant="ghost" size="icon" className="size-6"
+            disabled={entries.length === 0}
+            onClick={() => setPaused((p) => !p)}
+            title={paused ? t("taskbar.log.resume") : t("taskbar.log.pause")}
+          >
+            {paused ? <Play className="size-3" /> : <Pause className="size-3" />}
+          </Button>
+          {/* 清空 — 始终可见 */}
+          <Button
+            variant="ghost" size="icon" className="size-6"
+            disabled={entries.length === 0}
+            onClick={handleClear}
+            title={t("taskbar.log.clear")}
+          >
+            <Trash2 className="size-3" />
+          </Button>
+          {/* 导出 — 始终可见 */}
+          <Button
+            variant="ghost" size="icon" className="size-6"
+            disabled={entries.length === 0}
+            onClick={() => void exportLog()}
+            title={t("taskbar.log.export")}
+          >
+            <Download className="size-3" />
+          </Button>
+          {/* 展开/收起 */}
+          <Button
+            variant="ghost" size="icon" className="size-6"
             onClick={() => setExpanded(!expanded)}
             title={expanded ? t("taskbar.log.collapse") : t("taskbar.log.expand")}
           >
@@ -161,7 +180,13 @@ export function LogView({
       <div
         ref={scrollRef}
         className="overflow-y-auto font-mono text-xs leading-5"
-        style={{ height: `${height}px`, wordBreak: "break-all", whiteSpace: "pre-wrap" }}
+        style={{
+          height: expanded ? "100%" : "120px",
+          width: expanded ? `${logWidth}px` : "100%",
+          maxWidth: expanded ? `${window.innerWidth * MAX_WIDTH_PCT}px` : "100%",
+          wordBreak: "break-all",
+          whiteSpace: "pre-wrap",
+        }}
       >
         {entries.length === 0 ? (
           <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -185,6 +210,33 @@ export function LogView({
           })
         )}
       </div>
+
+      {/* 展开状态下右侧拖拽手柄 */}
+      {expanded && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
+          title={t("taskbar.log.resize")}
+          onMouseDown={onResizeStart}
+        >
+          <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-muted-foreground">
+            <GripVertical className="size-3" />
+          </div>
+        </div>
+      )}
+
+      {/* 清空确认弹窗 */}
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("taskbar.log.clearConfirm")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("taskbar.log.clearDesc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={doClear}>{t("taskbar.log.clear")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

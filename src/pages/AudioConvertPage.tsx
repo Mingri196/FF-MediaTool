@@ -28,6 +28,7 @@ import { api } from "@/lib/tauri";
 import { buildAudioArgs, fmtSec, type AudioSegment } from "@/audio/builder";
 import { AUDIO_BIT_DEPTHS, AUDIO_CODECS, AUDIO_FORMATS, AUDIO_SAMPLE_RATES } from "@/audio/formatPresets";
 import { defaultAudioParams, type AudioParams } from "@/audio/types";
+import { DropZone } from "@/components/shared/DropZone";
 import { FileRow } from "@/components/shared/FileRow";
 import { basename, deriveOutputPath } from "@/lib/format";
 import type { MediaBasicInfo } from "@/types";
@@ -73,8 +74,8 @@ export function AudioConvertPage() {
   const isVideoInput = media?.ok && media.hasVideo;
 
   /** 选输入 */
-  const pickInput = useCallback(async () => {
-    const picked = await open({
+  const pickInput = useCallback(async (path?: string) => {
+    const picked = path ?? await open({
       multiple: false,
       directory: false,
       title: t("audio.input"),
@@ -208,8 +209,9 @@ export function AudioConvertPage() {
   }, [durationSec, splitEvery]);
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl space-y-5 p-6">
+    <DropZone onFiles={([path]) => path && void pickInput(path)} className="h-full">
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-5xl space-y-5 p-6">
         <div>
           <h1 className="text-xl font-semibold">{t("audio.title")}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{t("audio.desc")}</p>
@@ -614,7 +616,8 @@ export function AudioConvertPage() {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </DropZone>
   );
 }
 

@@ -29,6 +29,7 @@ import { VIDEO_FORMATS } from "@/video/formatPresets";
 import { defaultVideoAudioParams, defaultVideoParams, type VideoParams } from "@/video/types";
 import { FilterSection } from "@/components/video/FilterSection";
 import { VideoEncodeSection } from "@/components/video/VideoEncodeSection";
+import { DropZone } from "@/components/shared/DropZone";
 import { FileRow } from "@/components/shared/FileRow";
 import { basename, deriveOutputPath, formatMs } from "@/lib/format";
 import type { EncoderPreset, MediaBasicInfo } from "@/types";
@@ -215,31 +216,32 @@ export function VideoConvertPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl space-y-5 p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold">{t("video.title")}</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">{t("video.desc")}</p>
+    <DropZone onFiles={([path]) => path && void pickInput(path)} className="h-full">
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-5xl space-y-5 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold">{t("video.title")}</h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">{t("video.desc")}</p>
+            </div>
+            {/* 预设快速调用 */}
+            <div className="flex items-center gap-2">
+              <Select value={presetId} onValueChange={(v) => v !== null && applyPreset(v)}>
+                <SelectTrigger className="w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{t("video.presetNone")}</SelectItem>
+                  {videoPresets.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" onClick={savePreset} title={t("video.savePreset")}>
+                <Save className="size-4" />
+              </Button>
+            </div>
           </div>
-          {/* 预设快速调用 */}
-          <div className="flex items-center gap-2">
-            <Select value={presetId} onValueChange={(v) => v !== null && applyPreset(v)}>
-              <SelectTrigger className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">{t("video.presetNone")}</SelectItem>
-                {videoPresets.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" onClick={savePreset} title={t("video.savePreset")}>
-              <Save className="size-4" />
-            </Button>
-          </div>
-        </div>
 
         {/* 输入 / 格式 / 输出 */}
         <Card>
@@ -377,7 +379,8 @@ export function VideoConvertPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </DropZone>
   );
 }
 

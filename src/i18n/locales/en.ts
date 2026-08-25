@@ -120,8 +120,10 @@ export const en: Record<I18nKey, string> = {
   "taskbar.log.pause": "Pause",
   "taskbar.log.resume": "Follow",
   "taskbar.log.clear": "Clear",
+  "taskbar.log.clearConfirm": "Confirm clear log",
+  "taskbar.log.clearDesc": "This will clear all log entries for the current task. This action cannot be undone.",
   "taskbar.log.export": "Export",
-    "taskbar.log.resize": "Drag to resize",
+    "taskbar.log.resize": "Drag to resize width",
     "taskbar.log.empty": "No log entries",
   "taskbar.log.expand": "Expand",
   "taskbar.log.collapse": "Collapse",
@@ -339,6 +341,9 @@ export const en: Record<I18nKey, string> = {
   "clip.flip": "Flip",
   "clip.cropEnable": "Crop",
   "clip.cycleNext": "Next segment",
+
+  "drop.hint": "Release to import file",
+  "drop.invalid": "Unsupported format: {names}",
 
   /* ---------- Timeline ---------- */
   "timeline.start": "Start",

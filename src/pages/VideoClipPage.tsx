@@ -22,6 +22,7 @@ import { buildVideoArgs, fmtSec, parseTimeToSec, type ClipRange } from "@/video/
 import { defaultVideoAudioParams, defaultVideoParams, type VideoParams } from "@/video/types";
 import { TimelineRange } from "@/components/video/TimelineRange";
 import { VideoEncodeSection } from "@/components/video/VideoEncodeSection";
+import { DropZone } from "@/components/shared/DropZone";
 import { FileRow } from "@/components/shared/FileRow";
 import { basename, deriveOutputPath } from "@/lib/format";
 
@@ -49,8 +50,8 @@ export function VideoClipPage() {
   const [video, setVideo] = useState<VideoParams>(defaultVideoParams);
   const [audio, setAudio] = useState(defaultVideoAudioParams);
 
-  const pickInput = useCallback(async () => {
-    const picked = await open({
+  const pickInput = useCallback(async (path?: string) => {
+    const picked = path ?? await open({
       multiple: false,
       directory: false,
       title: t("clip.input"),
@@ -139,8 +140,9 @@ export function VideoClipPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl space-y-5 p-6">
+    <DropZone onFiles={([path]) => path && void pickInput(path)} className="h-full">
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-5xl space-y-5 p-6">
         <div>
           <h1 className="text-xl font-semibold">{t("clip.title")}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{t("clip.desc")}</p>
@@ -325,7 +327,8 @@ export function VideoClipPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </DropZone>
   );
 }
 

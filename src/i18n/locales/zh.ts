@@ -121,8 +121,10 @@ export const zh = {
   "taskbar.log.pause": "暂停",
   "taskbar.log.resume": "跟随",
   "taskbar.log.clear": "清空",
+  "taskbar.log.clearConfirm": "确认清空日志",
+  "taskbar.log.clearDesc": "此操作将清空当前任务的所有日志内容，不可恢复。",
   "taskbar.log.export": "导出",
-  "taskbar.log.resize": "拖拽调整高度",
+  "taskbar.log.resize": "拖拽调整宽度",
   "taskbar.log.empty": "暂无日志",
   "taskbar.log.expand": "展开",
   "taskbar.log.collapse": "收起",
@@ -340,6 +342,9 @@ export const zh = {
   "clip.flip": "翻转",
   "clip.cropEnable": "画面裁剪",
   "clip.cycleNext": "下一段",
+
+  "drop.hint": "松开鼠标导入文件",
+  "drop.invalid": "不支持的文件格式：{names}",
 
   /* ---------- 时间轴 ---------- */
   "timeline.start": "起点",
