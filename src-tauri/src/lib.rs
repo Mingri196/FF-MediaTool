@@ -27,6 +27,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             settings::get_settings,
             settings::save_settings,
+            settings::open_opt_dir,
             ffmpeg::detect_ffmpeg,
                             ffmpeg::validate_ffmpeg_paths,
                             media::media_probe_basic,

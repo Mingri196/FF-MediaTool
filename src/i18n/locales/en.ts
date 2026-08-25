@@ -70,6 +70,19 @@ export const en: Record<I18nKey, string> = {
   "settings.ffmpeg.noPath": "Not set (use system PATH)",
   "settings.ffmpeg.useSystemHint": "Currently using the version from system PATH",
 
+  /* ---------- Default output path ---------- */
+  "settings.outputPath.title": "Default Output Path",
+  "settings.outputPath.desc": "Configure default output directories for all modules. If not customized, all files will be output to the \"opt\" folder in the application root directory.",
+  "settings.outputPath.globalDir": "Current Global Directory",
+  "settings.outputPath.openDir": "Open Default Directory",
+  "settings.outputPath.customToggle": "Custom Output Path",
+  "settings.outputPath.videoConvert": "Video Convert Output Path",
+  "settings.outputPath.audioConvert": "Audio Convert Output Path",
+  "settings.outputPath.imageConvert": "Image Convert Output Path",
+  "settings.outputPath.videoClip": "Video Clip Output Path",
+  "settings.outputPath.save": "Save",
+  "settings.outputPath.cancel": "Cancel",
+
   /* ---------- Presets ---------- */
   "settings.presets.title": "Encode Presets",
   "settings.presets.desc": "Save your custom encode parameters for quick use, rename and delete",
@@ -410,6 +423,7 @@ export const en: Record<I18nKey, string> = {
   "img.resizeValue2": "Value 2",
   "img.width": "Width",
   "img.height": "Height",
+  "img.auto": "Auto",
   "img.dpi": "DPI",
   "img.sectionEdit": "Edit",
   "img.rotate": "Rotate",

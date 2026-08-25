@@ -48,6 +48,24 @@ pub struct AppSettings {
     pub presets: Vec<EncoderPreset>,
     /// 首次启动向导是否已完成（FFmpeg 缺失弹窗只在首次启动时自动弹出一次）
     pub has_completed_first_run: bool,
+    /// 各功能模块的默认输出路径（自定义；为空时使用全局 opt 目录）
+    #[serde(default)]
+    pub output_paths: OutputPaths,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutputPaths {
+    pub video_convert: Option<String>,
+    pub audio_convert: Option<String>,
+    pub image_convert: Option<String>,
+    pub video_clip: Option<String>,
+}
+
+impl Default for OutputPaths {
+    fn default() -> Self {
+        Self { video_convert: None, audio_convert: None, image_convert: None, video_clip: None }
+    }
 }
 
 impl Default for AppSettings {
@@ -63,6 +81,7 @@ impl Default for AppSettings {
             recent_presets: Vec::new(),
             presets: Vec::new(),
             has_completed_first_run: false,
+            output_paths: OutputPaths::default(),
         }
     }
 }
@@ -155,4 +174,17 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<AppSetting
     let clean = sanitize(settings);
     save(&app, &clean)?;
     Ok(clean)
+}
+
+/// 在资源管理器中打开应用根目录的 opt 文件夹
+#[tauri::command]
+pub fn open_opt_dir(app: AppHandle) -> Result<(), String> {
+    let resource = app.path().resource_dir().map_err(|e| format!("无法获取资源目录: {e}"))?;
+    let opt = resource.join("opt");
+    std::fs::create_dir_all(&opt).map_err(|e| format!("无法创建 opt 目录: {e}"))?;
+    #[cfg(target_os = "windows")]
+    { let _ = std::process::Command::new("explorer").arg(&opt).spawn(); }
+    #[cfg(not(target_os = "windows"))]
+    { let _ = std::process::Command::new("open").arg(&opt).spawn(); }
+    Ok(())
 }

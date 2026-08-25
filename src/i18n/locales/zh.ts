@@ -71,6 +71,19 @@ export const zh = {
   "settings.ffmpeg.noPath": "未设置（使用系统 PATH）",
   "settings.ffmpeg.useSystemHint": "当前使用系统 PATH 中的版本",
 
+  /* ---------- 默认输出路径 ---------- */
+  "settings.outputPath.title": "默认输出路径",
+  "settings.outputPath.desc": "配置各功能模块的默认输出目录，未自定义时统一输出至程序根目录 opt 文件夹",
+  "settings.outputPath.globalDir": "当前全局默认目录",
+  "settings.outputPath.openDir": "打开默认目录",
+  "settings.outputPath.customToggle": "自定义输出路径",
+  "settings.outputPath.videoConvert": "视频转换输出路径",
+  "settings.outputPath.audioConvert": "音频转换输出路径",
+  "settings.outputPath.imageConvert": "图片转换输出路径",
+  "settings.outputPath.videoClip": "视频剪辑输出路径",
+  "settings.outputPath.save": "保存",
+  "settings.outputPath.cancel": "取消",
+
   /* ---------- 预设管理 ---------- */
   "settings.presets.title": "编码预设模板",
   "settings.presets.desc": "保存自定义编码参数，支持快速调用、重命名、删除",
@@ -411,6 +424,7 @@ export const zh = {
   "img.resizeValue2": "值 2",
   "img.width": "宽度",
   "img.height": "高度",
+  "img.auto": "自动",
   "img.dpi": "DPI",
   "img.sectionEdit": "编辑处理",
   "img.rotate": "旋转",

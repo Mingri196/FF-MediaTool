@@ -264,15 +264,15 @@ export function ImageConvertPage() {
                 <>
                   <div className="space-y-1.5">
                     <Label>{t("img.width")} (px)</Label>
-                    <Input type="number" min={16} max={8192} value={params.resize.value || ""} onChange={(e) => {
-                      const v = Math.max(16, Math.min(8192, Number(e.target.value) || 0));
+                    <Input type="number" min={1} max={16384} value={params.resize.value || ""} placeholder={t("img.auto")} onChange={(e) => {
+                      const v = Math.max(1, Math.min(16384, Number(e.target.value) || 0));
                       setParams({ ...params, resize: { ...params.resize, value: v } });
                     }} disabled={disabled} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>{t("img.height")} (px)</Label>
-                    <Input type="number" min={16} max={8192} value={params.resize.value2 || ""} onChange={(e) => {
-                      const v = Math.max(16, Math.min(8192, Number(e.target.value) || 0));
+                    <Input type="number" min={1} max={16384} value={params.resize.value2 || ""} placeholder={t("img.auto")} onChange={(e) => {
+                      const v = Math.max(1, Math.min(16384, Number(e.target.value) || 0));
                       setParams({ ...params, resize: { ...params.resize, value2: v } });
                     }} disabled={disabled} />
                   </div>

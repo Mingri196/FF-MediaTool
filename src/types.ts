@@ -22,6 +22,13 @@ export interface EncoderPreset {
   params: Record<string, unknown>;
 }
 
+export interface OutputPaths {
+  videoConvert?: string | null;
+  audioConvert?: string | null;
+  imageConvert?: string | null;
+  videoClip?: string | null;
+}
+
 export interface AppSettings {
   language: Language;
   theme: ThemeMode;
@@ -33,6 +40,7 @@ export interface AppSettings {
   recentPresets: string[];
   presets: EncoderPreset[];
   hasCompletedFirstRun: boolean;
+  outputPaths: OutputPaths;
 }
 
 export interface BinaryInfo {
