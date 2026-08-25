@@ -102,9 +102,13 @@ export function VideoConvertPage() {
 
   /** 智能匹配：切换输出格式 → 应用推荐编码器/质量/音频默认（PRD 3.1） */
   const applyFormat = useCallback(
-    (ext: string) => {
+    async (ext: string) => {
       setFormat(ext);
-      setOutput((prev) => (input ? deriveOutputPath(input, ext) : prev));
+      if (input) {
+        const cfgDir = settings?.outputPaths?.videoConvert || (await api.getOptDir());
+        const baseInput = joinPath(cfgDir, basename(input));
+        setOutput(deriveOutputPath(baseInput, ext));
+      }
       const preset = VIDEO_FORMATS.find((f) => f.ext === ext);
       if (!preset) return;
       setVideo((v) => ({

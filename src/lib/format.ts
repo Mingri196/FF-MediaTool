@@ -36,3 +36,8 @@ export function replaceExt(path: string, newExt: string): string {
 export function deriveOutputPath(input: string, newExt: string): string {
   return replaceExt(input, `_out.${newExt}`);
 }
+
+/** 清洗 Windows 长路径前缀 \\?\ */
+export function normalizePath(p: string): string {
+  return p.replace(/^\\\\?\\/, "");
+}

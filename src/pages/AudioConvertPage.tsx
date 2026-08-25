@@ -111,9 +111,13 @@ export function AudioConvertPage() {
 
   /** 智能匹配格式 */
   const applyFormat = useCallback(
-    (ext: string) => {
+    async (ext: string) => {
       setFormat(ext);
-      if (input) setOutput(deriveOutputPath(input, ext));
+      if (input) {
+        const cfgDir = settings?.outputPaths?.audioConvert || (await api.getOptDir());
+        const baseInput = cfgDir + "/" + basename(input);
+        setOutput(deriveOutputPath(baseInput, ext));
+      }
       const p = AUDIO_FORMATS.find((f) => f.ext === ext);
       if (!p) return;
       setAudio((a) => ({
