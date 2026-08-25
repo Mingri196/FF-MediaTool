@@ -4,6 +4,9 @@
 
 use std::time::Duration;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use serde::Serialize;
 use tauri::AppHandle;
 use tokio::process::Command;
@@ -12,6 +15,20 @@ use tokio::time::timeout;
 use crate::settings;
 
 const VERSION_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// 创建静默运行的 Command（Windows 下隐藏 CMD 窗口）
+pub fn silent_cmd(program: &str) -> Command {
+    #[cfg(target_os = "windows")]
+    {
+        let mut std_cmd = std::process::Command::new(program);
+        std_cmd.creation_flags(0x08000000);
+        return Command::from(std_cmd);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new(program)
+    }
+}
 
 /// 单个二进制的检测结果
 #[derive(Debug, Clone, Serialize)]
@@ -49,7 +66,7 @@ fn parse_version(first_line: &str) -> Option<String> {
 async fn probe_binary(bin_path: &str, bin_name: &str) -> Option<(String, String)> {
     let result = timeout(
         VERSION_TIMEOUT,
-        Command::new(bin_path).args(["-version"]).output(),
+        silent_cmd(bin_path).args(["-version"]).output(),
     )
     .await;
     let out = match result {

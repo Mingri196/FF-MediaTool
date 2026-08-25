@@ -1,7 +1,6 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
   "productName": "FF-MediaTool",
-  "version": "0.51.0",
+  "version": "0.53.0",
   "identifier": "com.ffmediatool.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -12,15 +11,15 @@
   "app": {
     "windows": [
       {
-        "title": "FF-MediaTool v0.51 Beta",
+        "title": "FF-MediaTool v0.53 Beta",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
         "minHeight": 600,
         "center": true,
         "resizable": true,
-                "visible": true,
-                "dragDropEnabled": true
+        "visible": true,
+        "dragDropEnabled": true
       }
     ],
     "security": {
@@ -28,10 +27,11 @@
     }
   },
   "bundle": {
-    "active": true,
-    "targets": "nsis",
-    "icon": [
-          "FF-MediaTool.ico"
-        ]
-  }
+      "active": true,
+      "targets": "nsis",
+      "icon": [
+        "FF-MediaTool.ico"
+      ],
+      "license": "license.txt"
+    }
 }

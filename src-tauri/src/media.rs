@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::AppHandle;
-use tokio::process::Command;
 
+use crate::ffmpeg::silent_cmd;
 use crate::settings;
 use crate::task::runner::resolve_binary;
 
@@ -54,7 +54,7 @@ async fn probe(app: &AppHandle, input: &str) -> Result<std::process::Output, Str
     let ffprobe = resolve_binary(settings::load(app).ffprobe_path.as_deref(), "ffprobe")
         .await
         .ok_or_else(|| "未找到 ffprobe，请在设置页配置 FFmpeg 环境".to_string())?;
-    Command::new(&ffprobe)
+    silent_cmd(&ffprobe)
         .args([
             "-v", "error",
             "-show_entries",
@@ -133,7 +133,7 @@ pub async fn detect_crop(app: AppHandle, path: String) -> Result<CropDetect, Str
         .ok_or_else(|| "未找到 ffmpeg，请在设置页配置 FFmpeg 环境".to_string())?;
     let out = tokio::time::timeout(
         Duration::from_secs(30),
-        Command::new(&ffmpeg)
+        silent_cmd(&ffmpeg)
             .args(["-v", "info", "-ss", "1", "-t", "2", "-i", &path, "-vf", "cropdetect=limit=24:round=2:reset=0", "-f", "null", "-"])
             .output(),
     )
@@ -212,7 +212,7 @@ pub async fn media_probe_full(app: AppHandle, path: String) -> MediaFullInfo {
     let ffprobe = match resolve_binary(settings::load(&app).ffprobe_path.as_deref(), "ffprobe").await {
         Some(b) => b, None => return error_result("未找到 ffprobe"),
     };
-    let out = match Command::new(&ffprobe).args(["-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", "-show_chapters", &path]).output().await {
+    let out = match silent_cmd(&ffprobe).args(["-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", "-show_chapters", &path]).output().await {
         Ok(o) => o, Err(e) => return error_result(&format!("ffprobe 执行失败: {e}")),
     };
     if !out.status.success() { return error_result(&String::from_utf8_lossy(&out.stderr).trim()); }

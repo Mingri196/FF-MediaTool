@@ -15,6 +15,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
 
+use crate::ffmpeg::silent_cmd;
 use crate::settings;
 use crate::task::model::{TaskInfo, TaskProgress};
 use crate::task::progress::ProgressParser;
@@ -53,7 +54,7 @@ pub async fn resolve_binary(manual: Option<&str>, name: &str) -> Option<String> 
 async fn probe_duration_ms(ffprobe_bin: &str, input: &str) -> i64 {
     let out = tokio::time::timeout(
         Duration::from_secs(10),
-        Command::new(ffprobe_bin)
+        silent_cmd(ffprobe_bin)
             .args([
                 "-v",
                 "error",
@@ -254,7 +255,7 @@ pub async fn build_command(
         .ok_or_else(|| {
             "未找到 ffmpeg，请在「设置 → FFmpeg 环境」中配置可执行文件路径".to_string()
         })?;
-    let mut cmd = Command::new(&bin);
+    let mut cmd = silent_cmd(&bin);
     cmd.args(["-y", "-hide_banner", "-nostats"])
         .args(args)
         .arg("-progress")
