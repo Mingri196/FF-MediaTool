@@ -72,3 +72,40 @@ export interface CropDetect {
   x: number;
   y: number;
 }
+
+/** 容器信息（模块五） */
+export interface FormatInfo {
+  filename: string;
+  formatName: string;
+  formatLongName: string;
+  duration: number;
+  size: number;
+  bitRate: number | null;
+  startTime: number;
+  nbStreams: number;
+}
+
+/** 视频流详细信息（模块五） */
+export interface VideoStreamInfo {
+  index: number; codecName: string; codecLongName: string; profile: string; level: number;
+  width: number; height: number; codedWidth: number; codedHeight: number; pixFmt: string;
+  colorSpace: string; colorPrimaries: string; colorTransfer: string; chromaLocation: string;
+  fieldOrder: string; hasBFrames: number; sampleAspectRatio: string; displayAspectRatio: string;
+  rFrameRate: string; avgFrameRate: string; bitRate: number | null; bitsPerRawSample: number | null;
+  refs: number; nbFrames: number | null; duration: number; tags: Record<string, string>;
+}
+
+/** 音频流详细信息（模块五） */
+export interface AudioStreamInfo {
+  index: number; codecName: string; codecLongName: string; profile: string;
+  sampleFmt: string; sampleRate: number; channels: number; channelLayout: string;
+  bitRate: number | null; maxBitRate: number | null; bitsPerSample: number;
+  duration: number; nbFrames: number | null; tags: Record<string, string>;
+}
+
+/** 全量媒体信息（模块五） */
+export interface MediaFullInfo {
+  ok: boolean; error: string | null;
+  format: FormatInfo; videoStreams: VideoStreamInfo[]; audioStreams: AudioStreamInfo[];
+  metadata: Record<string, string>;
+}

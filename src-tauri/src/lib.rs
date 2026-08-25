@@ -30,6 +30,7 @@ pub fn run() {
             ffmpeg::detect_ffmpeg,
                             ffmpeg::validate_ffmpeg_paths,
                             media::media_probe_basic,
+                            media::media_probe_full,
                             media::detect_crop,
                             task::task_add,
             task::task_stop,
