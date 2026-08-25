@@ -25,14 +25,18 @@ const LABEL_KEYS: Record<DropAccept, I18nKey> = {
   all: "drop.invalid",
 };
 
+/** 热区约束：排除左侧导航栏（约 180px）与底部任务栏（约 170px） */
+const NAV_WIDTH = 180;
+const BOTTOM_BAR_HEIGHT = 170;
+
 /**
- * 全功能主操作区拖拽导入（v0.20 修复版）。
+ * 全功能主操作区拖拽导入（v0.20.1 修复版）。
  *
- * 关键修复：Tauri WebView2 中 HTML5 drag-drop 的 dataTransfer.files 不可靠，
- * 改用 Tauri 原生 `getCurrentWebview().onDragDropEvent` 获取真实文件路径。
- * - HTML5 事件仅用于 preventDefault（阻止 WebView 打开文件）与高亮反馈
- * - 'drop' 事件通过 Tauri payload.paths 拿到路径 → 触发 onFiles
- * - 支持批量拖拽；按 accept 分级校验扩展名（video/audio/all）
+ * 关键修复：不要对 HTML5 拖拽事件调用 preventDefault —— Tauri 官方规定
+ * 这会阻止 `onDragDropEvent` 触发。本组件纯走 Tauri 原生事件：
+ * - enter/over  → 高亮（用事件 position 限定在主操作区内，导航/底栏不高亮）
+ * - drop        → 拿真实文件路径 → 按 accept 分级校验 → 触发 onFiles
+ * - leave/cancel→ 隐藏高亮
  */
 export function DropZone({
   children,
@@ -51,105 +55,69 @@ export function DropZone({
   onFilesRef.current = onFiles;
   const acceptRef = useRef(accept);
   acceptRef.current = accept;
-  const overlayCount = useRef(0);
 
-  // Tauri 原生拖拽事件（路径来源）
+  const handlePaths = (paths: string[]) => {
+    if (paths.length === 0) {
+      toast.error(t("drop.noPaths"));
+      return;
+    }
+    const accepted = EXTS[acceptRef.current];
+    const rejected: string[] = [];
+    const ok: string[] = [];
+    const seen = new Set<string>();
+    for (const p of paths) {
+      if (seen.has(p)) continue;
+      seen.add(p);
+      const ext = p.split(".").pop()?.toLowerCase() ?? "";
+      if (!accepted.has(ext)) rejected.push(p.split(/[\\/]/).pop() ?? p);
+      else ok.push(p);
+    }
+    if (rejected.length > 0) {
+      toast.error(t(LABEL_KEYS[acceptRef.current], { names: rejected.join(", ") }));
+    }
+    if (ok.length > 0) onFilesRef.current(ok);
+  };
+
+  const inHotZone = (x: number, y: number) =>
+    x >= NAV_WIDTH && y <= window.innerHeight - BOTTOM_BAR_HEIGHT;
+
+  // Tauri 原生拖拽事件（唯一事件来源，不做任何 preventDefault）
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
     (async () => {
-      const wv = getCurrentWebview();
-      unlisten = await wv.onDragDropEvent((e) => {
-        if (disposed) return;
-        if (e.payload.type === "enter" || e.payload.type === "over") {
-          overlayCount.current = 1;
-          setDragging(true);
-        } else if (e.payload.type === "leave") {
-          overlayCount.current = 0;
-          setDragging(false);
-        } else if (e.payload.type === "drop") {
-          overlayCount.current = 0;
-          setDragging(false);
-          const paths = e.payload.paths ?? [];
-          if (paths.length === 0) {
-            toast.error(t("drop.noPaths"));
-            return;
+      try {
+        unlisten = await getCurrentWebview().onDragDropEvent((e) => {
+          if (disposed) return;
+          const p = e.payload;
+          if (p.type === "enter" || p.type === "over") {
+            const pos = p.position;
+            const inZone = !pos || inHotZone(pos.x, pos.y);
+            setDragging(inZone);
+          } else if (p.type === "drop") {
+            setDragging(false);
+            handlePaths(p.paths ?? []);
+          } else {
+            // leave
+            setDragging(false);
           }
-          const valid = new Set(paths);
-          const accepted = EXTS[acceptRef.current];
-          const rejected: string[] = [];
-          const ok: string[] = [];
-          for (const p of valid) {
-            const ext = p.split(".").pop()?.toLowerCase() ?? "";
-            if (!accepted.has(ext)) rejected.push(p.split(/[\\/]/).pop() ?? p);
-            else ok.push(p);
-          }
-          if (rejected.length > 0) {
-            toast.error(t(LABEL_KEYS[acceptRef.current], { names: rejected.join(", ") }));
-          }
-          if (ok.length > 0) onFilesRef.current(ok);
-        }
-      });
+        });
+        // 测试钩子：供 E2E 确认监听已注册
+        (window as unknown as Record<string, unknown>).__ffmtDropReady = true;
+      } catch (err) {
+        console.warn("[DropZone] Tauri drag-drop listener failed:", err);
+        (window as unknown as Record<string, unknown>).__ffmtDropReady = false;
+      }
     })();
     return () => {
       disposed = true;
-      unlisten?.();
+      try { unlisten?.(); } catch { /* ignore */ }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // HTML5 事件：仅阻止默认行为（避免打开文件）+ 兜底高亮
-  const prevent = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  const enter = (e: React.DragEvent) => {
-    prevent(e);
-    overlayCount.current++;
-    setDragging(true);
-  };
-  const leave = (e: React.DragEvent) => {
-    prevent(e);
-    overlayCount.current = Math.max(0, overlayCount.current - 1);
-    if (overlayCount.current === 0) setDragging(false);
-  };
-  const over = (e: React.DragEvent) => {
-    prevent(e);
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-  };
-  const dropFallback = (e: React.DragEvent) => {
-    prevent(e);
-    overlayCount.current = 0;
-    setDragging(false);
-    // HTML5 兜底：仅当 Tauri 事件未提供路径时读取 files（部分环境仍有 .path 扩展）
-    const files = Array.from(e.dataTransfer?.files ?? []);
-    if (files.length > 0) {
-      const paths = files
-        .map((f) => (f as unknown as { path?: string }).path)
-        .filter((p): p is string => !!p);
-      if (paths.length > 0) {
-        const accepted = EXTS[acceptRef.current];
-        const rejected: string[] = [];
-        const ok = paths.filter((p) => {
-          const ext = p.split(".").pop()?.toLowerCase() ?? "";
-          const good = accepted.has(ext);
-          if (!good) rejected.push(p.split(/[\\/]/).pop() ?? p);
-          return good;
-        });
-        if (rejected.length > 0) toast.error(t(LABEL_KEYS[acceptRef.current], { names: rejected.join(", ") }));
-        if (ok.length > 0) onFilesRef.current(ok);
-      }
-    }
-  };
-
   return (
-    <div
-      className={cn("relative", className)}
-      onDragEnter={enter}
-      onDragOver={over}
-      onDragLeave={leave}
-      onDrop={dropFallback}
-    >
+    <div className={cn("relative", className)}>
       {children}
       {dragging && (
         <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/70 bg-background/85 backdrop-blur-[2px]">
