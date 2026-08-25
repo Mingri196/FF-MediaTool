@@ -282,7 +282,6 @@ export const zh = {
   "video.savePresetName": "预设名称",
   "video.presetSaved": "预设已保存",
   "video.start": "开始处理",
-  "video.dropHint": "拖入媒体文件或点击选择",
   "video.loadingInfo": "读取媒体信息…",
 
   /* ---------- 滤镜 ---------- */

@@ -249,7 +249,6 @@ export function VideoConvertPage() {
             <FileRow
               label={t("video.input")}
               value={input}
-              placeholder={t("video.dropHint")}
               onBrowse={() => void pickInput()}
               readOnly
               onChange={(v) => setInput(v)}

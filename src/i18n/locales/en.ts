@@ -281,7 +281,6 @@ export const en: Record<I18nKey, string> = {
   "video.savePresetName": "Preset name",
   "video.presetSaved": "Preset saved",
   "video.start": "Start",
-  "video.dropHint": "Drop a media file or click to browse",
   "video.loadingInfo": "Reading media info…",
 
   /* ---------- Filters ---------- */
