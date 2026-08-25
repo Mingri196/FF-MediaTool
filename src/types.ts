@@ -109,3 +109,13 @@ export interface MediaFullInfo {
   format: FormatInfo; videoStreams: VideoStreamInfo[]; audioStreams: AudioStreamInfo[];
   metadata: Record<string, string>;
 }
+
+/** 输出文件检查（模块六） */
+export interface OutputFileCheck {
+  exists: boolean; size: number; modified: string;
+}
+
+/** 参数校验结果（模块六） */
+export interface ValidationResult {
+  errors: string[]; warnings: string[];
+}

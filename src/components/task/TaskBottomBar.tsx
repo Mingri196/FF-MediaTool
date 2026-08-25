@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Square, Plus, Loader2, CircleAlert } from "lucide-react";
+import { Square, Plus, Loader2, CircleAlert, Lightbulb } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +9,7 @@ import { QuickTaskDialog } from "./QuickTaskDialog";
 import { useI18n } from "@/i18n";
 import { useTasks } from "@/tasks/TaskProvider";
 import { formatMs } from "@/lib/format";
+import { analyzeFfmpegError } from "@/lib/ffmpegErrors";
 
 /**
  * 底部固定任务栏（三栏布局的第三栏）：
@@ -18,7 +19,7 @@ import { formatMs } from "@/lib/format";
  */
 export function TaskBottomBar() {
   const { t } = useI18n();
-  const { tasks, queueIds, currentId, stopping, logs, addTask, stopTask, clearLog, statusLabel } =
+  const { tasks, queueIds, currentId, stopping, logs, guardAddTask, stopTask, clearLog, statusLabel } =
     useTasks();
   const [quickOpen, setQuickOpen] = useState(false);
 
@@ -137,6 +138,29 @@ export function TaskBottomBar() {
         )}
       </div>
 
+      {/* 错误分析（失败任务） */}
+      {logTask?.status === "failed" && logEntries.length > 0 && (
+        <div className="shrink-0 px-4 pb-1">
+          {(() => {
+            const stderr = logEntries.map((e) => e.line).join("\n");
+            const suggestions = analyzeFfmpegError(stderr);
+            return suggestions.length > 0 ? (
+              <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs">
+                {suggestions.slice(0, 2).map((s, i) => (
+                  <div key={i} className="flex items-start gap-1.5">
+                    <Lightbulb className="mt-0.5 size-3 shrink-0 text-destructive" />
+                    <div>
+                      <span className="font-medium text-destructive">{s.message}</span>
+                      <span className="ml-1 text-muted-foreground">— {s.suggestion}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null;
+          })()}
+        </div>
+      )}
+
       {/* 日志区 */}
       <div className="min-h-0 flex-1 px-2 pb-2">
         <LogView
@@ -147,7 +171,7 @@ export function TaskBottomBar() {
         />
       </div>
 
-      <QuickTaskDialog open={quickOpen} onOpenChange={setQuickOpen} onAdd={(nt) => void addTask(nt)} />
+      <QuickTaskDialog open={quickOpen} onOpenChange={setQuickOpen} onAdd={(nt) => void guardAddTask(nt)} />
     </div>
   );
 }

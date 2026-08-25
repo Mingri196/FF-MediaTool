@@ -55,6 +55,7 @@ export function BatchPage() {
     tasks,
     queueIds,
     currentId,
+    guardAddTask,
     addTask,
     stopTask,
     removeTask,
@@ -266,7 +267,7 @@ export function BatchPage() {
         </Card>
       </div>
 
-      <QuickTaskDialog open={quickOpen} onOpenChange={setQuickOpen} onAdd={(nt) => void addTask(nt)} />
+      <QuickTaskDialog open={quickOpen} onOpenChange={setQuickOpen} onAdd={(nt) => void guardAddTask(nt)} />
     </div>
   );
 }

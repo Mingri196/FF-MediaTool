@@ -344,6 +344,13 @@ export const zh = {
   "timeline.start": "起点",
   "timeline.end": "终点",
 
+  /* ---------- 文件保护 ---------- */
+  "fileguard.title": "输出文件已存在",
+  "fileguard.desc": "文件已存在：{path}",
+  "fileguard.overwrite": "覆盖",
+  "fileguard.rename": "自动重命名",
+  "fileguard.cancel": "取消",
+
   /* ---------- 音频格式 ---------- */
   "afmt.mp3": "MP3（通用有损）",
   "afmt.aac": "AAC（Apple/流媒体）",

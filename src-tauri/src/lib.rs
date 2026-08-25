@@ -39,6 +39,8 @@ pub fn run() {
             task::task_clear_finished,
             task::tasks_snapshot,
             util::write_text_file,
+            util::check_output_file,
+            util::validate_task_args,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

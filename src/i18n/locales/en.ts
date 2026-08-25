@@ -343,6 +343,13 @@ export const en: Record<I18nKey, string> = {
   "timeline.start": "Start",
   "timeline.end": "End",
 
+  /* ---------- File guard ---------- */
+  "fileguard.title": "Output file exists",
+  "fileguard.desc": "File already exists: {path}",
+  "fileguard.overwrite": "Overwrite",
+  "fileguard.rename": "Auto rename",
+  "fileguard.cancel": "Cancel",
+
   /* ---------- Audio formats ---------- */
   "afmt.mp3": "MP3 (lossy)",
   "afmt.aac": "AAC (Apple/streaming)",

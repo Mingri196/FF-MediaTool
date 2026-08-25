@@ -45,7 +45,7 @@ const CHANNEL_MODES = [
 /** 音频转换页（PRD 4.1-4.4）：转换/提取/分割/拼接 + 音量声道处理 + 滤镜 */
 export function AudioConvertPage() {
   const { t } = useI18n();
-  const { addTask } = useTasks();
+  const { guardAddTask } = useTasks();
 
   const [input, setInput] = useState("");
   const [media, setMedia] = useState<MediaBasicInfo | null>(null);
@@ -142,7 +142,7 @@ export function AudioConvertPage() {
       concat: extra?.concat ?? null,
       extract: extra?.track !== undefined ? { trackIndex: extra.track } : null,
     });
-    void addTask({
+    void guardAddTask({
       name: `${basename(input)} → ${basename(out)}`,
       args,
       inputPath: input,
@@ -174,7 +174,7 @@ export function AudioConvertPage() {
       const end = i === count - 1 ? durationSec : (i + 1) * segDur;
       const out = insertSuffix(output, `_${String(i + 1).padStart(2, "0")}`);
       outs.push(out);
-      void addTask({
+      void guardAddTask({
         name: `${basename(input)} → ${basename(out)}`,
         args: buildAudioArgs({
           input,

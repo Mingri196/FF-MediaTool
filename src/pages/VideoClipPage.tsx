@@ -36,7 +36,7 @@ interface Segment {
 /** 视频剪辑页（PRD 3.2）：时间裁剪 + 多片段拼接 + 画面处理（旋转/翻转/裁剪） */
 export function VideoClipPage() {
   const { t } = useI18n();
-  const { addTask } = useTasks();
+  const { guardAddTask } = useTasks();
 
   const [input, setInput] = useState("");
   const [durationSec, setDurationSec] = useState(0);
@@ -120,7 +120,7 @@ export function VideoClipPage() {
 
   const start = () => {
     if (!input || !output || !canStart) return;
-    void addTask({
+    void guardAddTask({
       name: `${basename(input)} → ${basename(output)}`,
       args: args!,
       inputPath: input,

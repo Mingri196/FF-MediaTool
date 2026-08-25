@@ -19,21 +19,31 @@ import type {
   TaskStatus,
 } from "./types";
 import { useI18n } from "@/i18n";
+import { api } from "@/lib/tauri";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /** 每个任务的日志环形缓冲上限（行数），防止内存无限增长 */
 const MAX_LOG_LINES = 3000;
 
 interface TaskContextValue {
-  /** 全部已知任务（含队列/当前/历史） */
   tasks: Map<string, TaskInfo>;
-  /** 队列中的任务 id（按顺序） */
   queueIds: string[];
   currentId: string | null;
   stopping: boolean;
-  /** 按任务 id 的日志缓冲 */
   logs: Map<string, LogEntry[]>;
   seqRef: React.MutableRefObject<number>;
   addTask: (task: NewTask) => Promise<TaskInfo | null>;
+  /** 带文件保护 + 参数校验的添加任务（PRD 6.3） */
+  guardAddTask: (task: NewTask) => Promise<void>;
   stopTask: (id: string) => Promise<void>;
   removeTask: (id: string) => Promise<void>;
   reorderTask: (id: string, dir: "up" | "down") => Promise<void>;
@@ -52,6 +62,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const [stopping, setStopping] = useState(false);
   const [logs, setLogs] = useState<Map<string, LogEntry[]>>(new Map());
   const seqRef = useRef(0);
+  const [conflict, setConflict] = useState<{ task: NewTask; resolve: (action: "overwrite" | "rename" | "cancel") => void } | null>(null);
 
   // ---- 事件订阅 ----
   useEffect(() => {
@@ -102,7 +113,6 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         setQueueIds(snap.queue.map((x) => x.id));
         setCurrentId(snap.current?.id ?? null);
         setStopping(snap.stopping);
-        // 已有历史任务的日志占位
         setLogs((prev) => {
           const next = new Map(prev);
           for (const task of [...snap.history, ...snap.queue, ...(snap.current ? [snap.current] : [])]) {
@@ -137,6 +147,41 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       }
     },
     [t],
+  );
+
+  /** 带文件保护 + 参数校验的添加任务（PRD 6.3） */
+  const guardAddTask = useCallback(
+    async (task: NewTask) => {
+      if (task.args.length === 0) {
+        toast.error(t("error.taskAddFailed"));
+        return;
+      }
+      // 文件保护：检查输出文件是否存在
+      try {
+        const check = await api.checkOutputFile(task.outputPath);
+        if (check.exists) {
+          return new Promise<void>((resolve) => {
+            setConflict({ task: { ...task }, resolve: (action) => {
+              const t = task;
+              if (action === "cancel") { resolve(); return; }
+              if (action === "rename") {
+                const dot = t.outputPath.lastIndexOf(".");
+                const slash = Math.max(t.outputPath.lastIndexOf("\\"), t.outputPath.lastIndexOf("/"));
+                t.outputPath = dot > slash
+                  ? t.outputPath.slice(0, dot) + "_1" + t.outputPath.slice(dot)
+                  : t.outputPath + "_1";
+                t.name = `${t.inputPath.split(/[\\/]/).pop() ?? ""} → ${t.outputPath.split(/[\\/]/).pop() ?? ""}`;
+                if (t.args.length > 0) t.args[t.args.length - 1] = t.outputPath;
+              }
+              addTask(t);
+              resolve();
+            }});
+          });
+        }
+      } catch { /* 检查失败则继续 */ }
+      addTask(task);
+    },
+    [addTask, t],
   );
 
   const stopTask = useCallback(
@@ -215,24 +260,50 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<TaskContextValue>(
     () => ({
-      tasks,
-      queueIds,
-      currentId,
-      stopping,
-      logs,
-      seqRef,
-      addTask,
-      stopTask,
-      removeTask,
-      reorderTask,
-      clearFinished,
-      clearLog,
-      statusLabel,
+      tasks, queueIds, currentId, stopping, logs, seqRef,
+      addTask, guardAddTask, stopTask, removeTask, reorderTask,
+      clearFinished, clearLog, statusLabel,
     }),
-    [tasks, queueIds, currentId, stopping, logs, addTask, stopTask, removeTask, reorderTask, clearFinished, clearLog, statusLabel],
+    [tasks, queueIds, currentId, stopping, logs, addTask, guardAddTask, stopTask, removeTask, reorderTask, clearFinished, clearLog, statusLabel],
   );
 
-  return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
+  return (
+    <TaskContext.Provider value={value}>
+      {children}
+      <OutputConflictDialog
+        open={!!conflict}
+        taskName={conflict?.task.outputPath}
+        onOverwrite={() => { conflict?.resolve("overwrite"); setConflict(null); }}
+        onRename={() => { conflict?.resolve("rename"); setConflict(null); }}
+        onCancel={() => { conflict?.resolve("cancel"); setConflict(null); }}
+      />
+    </TaskContext.Provider>
+  );
+}
+
+function OutputConflictDialog({
+  open, taskName, onOverwrite, onRename, onCancel,
+}: {
+  open: boolean; taskName?: string; onOverwrite: () => void; onRename: () => void; onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <AlertDialog open={open} onOpenChange={(o) => !o && onCancel()}>
+      <AlertDialogContent className="sm:max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("fileguard.title")}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("fileguard.desc", { path: taskName ?? "" })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onCancel}>{t("common.cancel")}</AlertDialogCancel>
+          <AlertDialogAction onClick={onRename} variant="outline">{t("fileguard.rename")}</AlertDialogAction>
+          <AlertDialogAction onClick={onOverwrite}>{t("fileguard.overwrite")}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }
 
 export function useTasks(): TaskContextValue {

@@ -42,7 +42,7 @@ import type { EncoderPreset, MediaBasicInfo } from "@/types";
 export function VideoConvertPage() {
   const { t } = useI18n();
   const { settings, update } = useSettings();
-  const { addTask } = useTasks();
+  const { guardAddTask } = useTasks();
 
   const [input, setInput] = useState("");
   const [media, setMedia] = useState<MediaBasicInfo | null>(null);
@@ -201,7 +201,7 @@ export function VideoConvertPage() {
   const start = () => {
     if (!input || !output) return;
     const args = buildVideoArgs({ input, output, video, audio });
-    void addTask({
+    void guardAddTask({
       name: `${basename(input)} → ${basename(output)}`,
       args,
       inputPath: input,
