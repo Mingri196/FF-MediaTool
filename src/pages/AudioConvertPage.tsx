@@ -23,6 +23,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useSettings } from "@/settings/SettingsProvider";
 import { useTasks } from "@/tasks/TaskProvider";
 import { api } from "@/lib/tauri";
 import { buildAudioArgs, fmtSec, type AudioSegment } from "@/audio/builder";
@@ -46,6 +47,7 @@ const CHANNEL_MODES = [
 /** 音频转换页（PRD 4.1-4.4）：转换/提取/分割/拼接 + 音量声道处理 + 滤镜 */
 export function AudioConvertPage() {
   const { t } = useI18n();
+  const { settings } = useSettings();
   const { guardAddTask } = useTasks();
 
   const [input, setInput] = useState("");
@@ -88,7 +90,10 @@ export function AudioConvertPage() {
     setInput(picked);
     const dir = picked.replace(/[\\/][^\\/]+$/, "");
     window.dispatchEvent(new CustomEvent("ffmt:last-input-dir", { detail: dir }));
-    setOutput(deriveOutputPath(picked, format));
+    // 使用默认输出路径，不跟随输入目录
+    const defaultDir = settings?.outputPaths?.audioConvert ?? "";
+    const baseInput = defaultDir ? defaultDir + "/" + basename(picked) : picked;
+    setOutput(deriveOutputPath(baseInput, format));
     try {
       const info = await api.mediaProbeBasic(picked);
       setMedia(info);

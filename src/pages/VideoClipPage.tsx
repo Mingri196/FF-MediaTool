@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useSettings } from "@/settings/SettingsProvider";
 import { useTasks } from "@/tasks/TaskProvider";
 import { api } from "@/lib/tauri";
 import { buildVideoArgs, fmtSec, parseTimeToSec, type ClipRange } from "@/video/builder";
@@ -37,6 +38,7 @@ interface Segment {
 /** 视频剪辑页（PRD 3.2）：时间裁剪 + 多片段拼接 + 画面处理（旋转/翻转/裁剪） */
 export function VideoClipPage() {
   const { t } = useI18n();
+  const { settings } = useSettings();
   const { guardAddTask } = useTasks();
 
   const [input, setInput] = useState("");
@@ -58,7 +60,10 @@ export function VideoClipPage() {
     });
     if (typeof picked !== "string" || !picked) return;
     setInput(picked);
-    setOutput(deriveOutputPath(picked, "mp4"));
+    // 使用默认输出路径，不跟随输入目录
+    const defaultDir = settings?.outputPaths?.videoClip ?? "";
+    const baseInput = defaultDir ? defaultDir + "/" + basename(picked) : picked;
+    setOutput(deriveOutputPath(baseInput, "mp4"));
     const dir = picked.replace(/[\\/][^\\/]+$/, "");
     window.dispatchEvent(new CustomEvent("ffmt:last-input-dir", { detail: dir }));
     try {

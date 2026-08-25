@@ -79,8 +79,9 @@ export function VideoConvertPage() {
       if (dir !== lastOutputDir) {
         window.dispatchEvent(new CustomEvent("ffmt:last-input-dir", { detail: dir }));
       }
-      // 自动生成输出（沿用上次输出目录或输入目录）
-      const baseInput = joinPath(lastOutputDir ?? dir, basename(picked));
+      // 自动生成输出（使用默认输出路径，不跟随输入目录）
+      const defaultDir = settings?.outputPaths?.videoConvert ?? "";
+      const baseInput = defaultDir ? joinPath(defaultDir, basename(picked)) : picked;
       setOutput(deriveOutputPath(baseInput, format));
       // 读取媒体信息
       setProbing(true);
