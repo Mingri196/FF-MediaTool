@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Play, Save, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import { FilterSection } from "@/components/video/FilterSection";
 import { VideoEncodeSection } from "@/components/video/VideoEncodeSection";
 import { DropZone } from "@/components/shared/DropZone";
 import { FileRow } from "@/components/shared/FileRow";
+import { Input } from "@/components/ui/input";
 import { basename, deriveOutputPath, formatMs } from "@/lib/format";
 import type { EncoderPreset, MediaBasicInfo } from "@/types";
 
@@ -120,18 +121,11 @@ export function VideoConvertPage() {
     [input],
   );
 
-  // ---- 输出路径 ----
-  const pickOutput = async () => {
-    const picked = await saveDialog({
-      title: t("video.outputPath"),
-      defaultPath: output || undefined,
-    });
-    if (typeof picked === "string" && picked) {
-      setOutput(picked);
-      const dir = picked.replace(/[\\/][^\\/]+$/, "");
-      update({ lastOutputDir: dir });
-    }
-  };
+  // ---- 输出路径（从设置读取默认值） ----
+  const defaultOutput = settings?.outputPaths?.videoConvert ?? "";
+  useEffect(() => {
+    if (defaultOutput && !output) setOutput(defaultOutput);
+  }, [defaultOutput]);
 
   // 输入变化时记忆输出目录
   useEffect(() => {
@@ -288,12 +282,8 @@ export function VideoConvertPage() {
                 </Select>
               </div>
               <div className="col-span-2 space-y-1.5">
-                <FileRow
-                  label={t("video.outputPath")}
-                  value={output}
-                  onBrowse={() => void pickOutput()}
-                  onChange={(v) => setOutput(v)}
-                />
+                <Label>{t("video.outputPath")}</Label>
+                <Input type="text" value={output} onChange={(e) => setOutput(e.target.value)} placeholder="opt" />
               </div>
             </div>
             {format === "mp4" && (

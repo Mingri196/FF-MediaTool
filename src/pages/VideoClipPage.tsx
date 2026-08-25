@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Plus, Play, Trash2, ScanSearch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -129,11 +129,6 @@ export function VideoClipPage() {
     });
   };
 
-  const pickOutput = async () => {
-    const picked = await saveDialog({ title: t("clip.output"), defaultPath: output });
-    if (typeof picked === "string" && picked) setOutput(picked);
-  };
-
   const cycleToNext = () => {
     const next = (activeIdx + 1) % segments.length;
     setActiveIdx(next);
@@ -229,7 +224,10 @@ export function VideoClipPage() {
             )}
 
             {/* 输出 */}
-            <FileRow label={t("clip.output")} value={output} onBrowse={() => void pickOutput()} onChange={setOutput} />
+            <div className="space-y-1.5">
+              <Label>{t("clip.output")}</Label>
+              <Input type="text" value={output} onChange={(e) => setOutput(e.target.value)} placeholder="opt" />
+            </div>
           </CardContent>
         </Card>
 

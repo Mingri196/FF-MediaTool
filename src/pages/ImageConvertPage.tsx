@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ImagePlus, FolderOpen, Trash2, Play, RotateCw, FlipHorizontal, FlipVertical, Crop, Palette, Expand } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DropZone } from "@/components/shared/DropZone";
 import { useI18n } from "@/i18n";
 import { useTasks } from "@/tasks/TaskProvider";
+import { useSettings } from "@/settings/SettingsProvider";
 import { buildImageArgs, genOutputPath } from "@/image/builder";
 import { defaultImageParams, IMAGE_OUTPUT_FORMATS, type ImageFileItem, type ImageParams } from "@/image/types";
 import { INPUT_IMAGE_EXTS, getPreset, applyFormatDefaults } from "@/image/formatPresets";
@@ -41,6 +42,7 @@ const RESIZE_TOOLTIPS: Record<string, string> = {
 export function ImageConvertPage() {
   const { t } = useI18n();
   const { guardAddTask } = useTasks();
+  const { settings } = useSettings();
   const [files, setFiles] = useState<ImageFileItem[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [params, setParams] = useState<ImageParams>(defaultImageParams());
@@ -48,6 +50,7 @@ export function ImageConvertPage() {
 
   const allSelected = files.length > 0 && selected.size === files.length;
   const selectedCount = selected.size;
+  const firstSelectedFile = selectedCount === 1 ? files[[...selected][0]] : null;
 
   const addFiles = useCallback(async (paths?: string[]) => {
     if (!paths) {
@@ -120,6 +123,22 @@ export function ImageConvertPage() {
     setSelected(new Set());
   };
   const clearFiles = () => { setFiles([]); setSelected(new Set()); };
+
+  // 输出目录从设置同步
+  useEffect(() => {
+    const imgPath = settings?.outputPaths?.imageConvert;
+    if (imgPath) setParams((p) => ({ ...p, outputDir: imgPath }));
+  }, [settings?.outputPaths?.imageConvert]);
+
+  // 单张选中时自动填充宽高，多图/无图时清空
+  useEffect(() => {
+    if (firstSelectedFile) {
+      // 在 builder 中可通过 ffprobe 获取实际尺寸，此处用占位符
+      // 实际尺寸由用户手动输入，或留空自动
+    } else if (selectedCount !== 1) {
+      setParams((p) => ({ ...p, resize: { ...p.resize, value: 0, value2: 0 } }));
+    }
+  }, [firstSelectedFile, selectedCount]);
 
   const formatPreset = useMemo(() => getPreset(params.format), [params.format]);
   const isLossless = params.lossless;

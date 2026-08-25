@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Play, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,11 +121,6 @@ export function AudioConvertPage() {
     [input],
   );
 
-  const outputPicker = async () => {
-    const picked = await saveDialog({ title: t("video.outputPath"), defaultPath: output });
-    if (typeof picked === "string" && picked) setOutput(picked);
-  };
-
   const audioStreams = useMemo(
     () => (media?.streams ?? []).filter((s) => s.codecType === "audio"),
     [media],
@@ -245,7 +240,8 @@ export function AudioConvertPage() {
                 </Select>
               </div>
               <div className="col-span-2 space-y-1.5">
-                <FileRow label={t("audio.outputPath")} value={output} onBrowse={() => void outputPicker()} onChange={setOutput} />
+                <Label>{t("audio.outputPath")}</Label>
+                <Input type="text" value={output} onChange={(e) => setOutput(e.target.value)} placeholder="opt" />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">{t("audio.losslessHint")}</p>
