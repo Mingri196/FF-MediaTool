@@ -6,6 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import { zh, type I18nKey } from "./locales/zh";
+
+export type { I18nKey };
 import { en } from "./locales/en";
 import type { Language } from "@/types";
 

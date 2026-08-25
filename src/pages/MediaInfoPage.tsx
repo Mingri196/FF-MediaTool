@@ -148,7 +148,7 @@ export function MediaInfoPage() {
   };
 
   return (
-    <DropZone onFiles={([path]) => path && void pickInput(path)} className="h-full">
+    <DropZone onFiles={([path]) => path && void pickInput(path)} accept="all" className="h-full">
       <div className="h-full overflow-y-auto">
         <div className="mx-auto max-w-4xl space-y-5 p-6">
         <div>

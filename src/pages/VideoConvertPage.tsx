@@ -216,7 +216,7 @@ export function VideoConvertPage() {
   };
 
   return (
-    <DropZone onFiles={([path]) => path && void pickInput(path)} className="h-full">
+    <DropZone onFiles={([path]) => path && void pickInput(path)} accept="video" className="h-full">
       <div className="h-full overflow-y-auto">
         <div className="mx-auto max-w-5xl space-y-5 p-6">
           <div className="flex items-start justify-between gap-4">

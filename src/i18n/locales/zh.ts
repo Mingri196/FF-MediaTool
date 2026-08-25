@@ -112,6 +112,7 @@ export const zh = {
   "taskbar.stopping": "正在停止…",
   "taskbar.stop": "停止",
   "taskbar.noTask": "暂无任务",
+  "taskbar.status": "任务状态",
   "taskbar.eta": "剩余 {time}",
   "taskbar.elapsed": "已处理 {time}",
   "taskbar.speed": "{speed}x",
@@ -345,6 +346,9 @@ export const zh = {
 
   "drop.hint": "松开鼠标导入文件",
   "drop.invalid": "不支持的文件格式：{names}",
+  "drop.acceptVideo": "仅支持视频/图片/字幕文件：{names}",
+  "drop.acceptAudio": "仅支持音频文件：{names}",
+  "drop.noPaths": "无法读取拖拽文件路径，请改用按钮选择文件",
 
   /* ---------- 时间轴 ---------- */
   "timeline.start": "起点",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Trash2, Download, Pause, Play, Maximize2, Minimize2, GripVertical } from "lucide-react";
 import { toast } from "sonner";
@@ -19,53 +19,59 @@ import { api } from "@/lib/tauri";
 import { isErrorLine } from "@/lib/ffmpegErrors";
 import type { LogEntry } from "@/tasks/types";
 
-const DEFAULT_WIDTH_KEY = "ffmt-log-width";
-const DEFAULT_WIDTH = 400;
-const MIN_WIDTH = 200;
-const MAX_WIDTH_PCT = 0.7;
+const WIDTH_KEY = "ffmt-log-width";
+export const DEFAULT_LOG_WIDTH = 420;
+export const MIN_LOG_WIDTH = 220;
+export const MAX_LOG_WIDTH_PCT = 0.7;
 
-function loadWidth(): number {
+export function loadLogWidth(): number {
   try {
-    const v = localStorage.getItem(DEFAULT_WIDTH_KEY);
-    if (v) return Math.max(MIN_WIDTH, Math.min(window.innerWidth * MAX_WIDTH_PCT, Number(v)));
+    const v = localStorage.getItem(WIDTH_KEY);
+    if (v) return Math.max(MIN_LOG_WIDTH, Math.min(window.innerWidth * MAX_LOG_WIDTH_PCT, Number(v)));
   } catch { /* ignore */ }
-  return DEFAULT_WIDTH;
+  return DEFAULT_LOG_WIDTH;
 }
 
+export function persistLogWidth(w: number) {
+  try { localStorage.setItem(WIDTH_KEY, String(w)); } catch { /* ignore */ }
+}
+
+/**
+ * 日志面板（v0.20 修复版）：
+ * - 等宽字体 + 统一行高，语义折行（break-words）不横向溢出
+ * - 错误/警告整行高亮，多行换行连续不断裂
+ * - 垂直滚动条贴右缘，滚动范围与内容匹配
+ * - 组件常驻（收起时仅改变尺寸），滚动位置 / 暂停状态天然保持同步
+ * - 宽度由父级传入（展开时右侧列），宽度记忆由 TaskBottomBar 负责
+ */
 export function LogView({
   entries,
   onClear,
   emptyText,
   className,
-  expanded: controlledExpanded,
-  onExpandedChange,
+  expanded,
+  onToggleExpanded,
+  width,
+  onResizeWidth,
 }: {
   entries: LogEntry[];
   onClear?: () => void;
   emptyText?: string;
   className?: string;
-  expanded?: boolean;
-  onExpandedChange?: (v: boolean) => void;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  width: number;
+  onResizeWidth: (w: number) => void;
 }) {
   const { t } = useI18n();
-  const [localExpanded, setLocalExpanded] = useState(false);
-  const expanded = controlledExpanded ?? localExpanded;
-  const setExpanded = onExpandedChange ?? setLocalExpanded;
-
   const [paused, setPaused] = useState(false);
-  const [logWidth, setLogWidth] = useState(loadWidth);
   const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef(false);
   const startX = useRef(0);
   const startW = useRef(0);
 
-  // 持久化宽度
-  const persistWidth = useCallback((w: number) => {
-    try { localStorage.setItem(DEFAULT_WIDTH_KEY, String(w)); } catch { /* ignore */ }
-  }, []);
-
-  // 自动滚动
+  // 自动滚动到底部（除非暂停；组件常驻，收起时同样跟随）
   useEffect(() => {
     if (paused || !scrollRef.current) return;
     const el = scrollRef.current;
@@ -73,42 +79,31 @@ export function LogView({
     if (isNearBottom) el.scrollTop = el.scrollHeight;
   }, [entries, paused]);
 
-  // 拖拽调整宽度（右侧边缘）
+  // 右侧边缘拖拽调整宽度
   const onResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     dragRef.current = true;
     startX.current = e.clientX;
-    startW.current = logWidth;
+    startW.current = width;
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
       const delta = ev.clientX - startX.current;
-      const maxW = window.innerWidth * MAX_WIDTH_PCT;
-      const next = Math.max(MIN_WIDTH, Math.min(maxW, startW.current + delta));
-      setLogWidth(next);
+      const maxW = window.innerWidth * MAX_LOG_WIDTH_PCT;
+      const next = Math.max(MIN_LOG_WIDTH, Math.min(maxW, startW.current + delta));
+      onResizeWidth(next);
     };
     const onUp = () => {
       dragRef.current = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
-      persistWidth(logWidth);
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
-  };
-
-  const handleClear = () => {
-    if (onClear) {
-      setConfirmClear(true);
-    }
-  };
-
-  const doClear = () => {
-    onClear?.();
-    setConfirmClear(false);
   };
 
   const exportLog = async () => {
@@ -128,103 +123,84 @@ export function LogView({
   };
 
   return (
-    <div className={cn("flex flex-col relative", className)}>
-      {/* 工具栏 —— 按钮始终可见 */}
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-2 py-1">
-        <span className="text-xs font-medium text-muted-foreground">
-          {t("taskbar.log.title")}
-          {entries.length > 0 && (
-            <span className="ml-1.5 font-mono text-[10px]">{entries.length}</span>
-          )}
-        </span>
-        <div className="flex items-center gap-0.5">
-          {/* 暂停/继续 — 始终可见 */}
-          <Button
-            variant="ghost" size="icon" className="size-6"
-            disabled={entries.length === 0}
-            onClick={() => setPaused((p) => !p)}
-            title={paused ? t("taskbar.log.resume") : t("taskbar.log.pause")}
-          >
-            {paused ? <Play className="size-3" /> : <Pause className="size-3" />}
-          </Button>
-          {/* 清空 — 始终可见 */}
-          <Button
-            variant="ghost" size="icon" className="size-6"
-            disabled={entries.length === 0}
-            onClick={handleClear}
-            title={t("taskbar.log.clear")}
-          >
-            <Trash2 className="size-3" />
-          </Button>
-          {/* 导出 — 始终可见 */}
-          <Button
-            variant="ghost" size="icon" className="size-6"
-            disabled={entries.length === 0}
-            onClick={() => void exportLog()}
-            title={t("taskbar.log.export")}
-          >
-            <Download className="size-3" />
-          </Button>
-          {/* 展开/收起 */}
-          <Button
-            variant="ghost" size="icon" className="size-6"
-            onClick={() => setExpanded(!expanded)}
-            title={expanded ? t("taskbar.log.collapse") : t("taskbar.log.expand")}
-          >
-            {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-          </Button>
-        </div>
-      </div>
-
-      {/* 日志内容 */}
+    <>
       <div
-        ref={scrollRef}
-        className="overflow-y-auto font-mono text-xs leading-5"
-        style={{
-          height: expanded ? "100%" : "120px",
-          width: expanded ? `${logWidth}px` : "100%",
-          maxWidth: expanded ? `${window.innerWidth * MAX_WIDTH_PCT}px` : "100%",
-          wordBreak: "break-all",
-          whiteSpace: "pre-wrap",
-        }}
+        className={cn("relative flex flex-col overflow-hidden", className)}
+        style={expanded ? { width: `${width}px`, maxWidth: `${window.innerWidth * MAX_LOG_WIDTH_PCT}px` } : undefined}
       >
-        {entries.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            {emptyText ?? t("taskbar.log.empty")}
+        {/* 工具栏 —— 收起/展开均可见 */}
+        <div className="flex h-8 shrink-0 items-center justify-between border-b border-border pl-2 pr-1">
+          <span className="truncate text-xs font-medium text-muted-foreground">
+            {t("taskbar.log.title")}
+            {entries.length > 0 && (
+              <span className="ml-1.5 font-mono text-[10px]">{entries.length}</span>
+            )}
+          </span>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Button variant="ghost" size="icon" className="size-6" disabled={entries.length === 0}
+              onClick={() => setPaused((p) => !p)}
+              title={paused ? t("taskbar.log.resume") : t("taskbar.log.pause")}>
+              {paused ? <Play className="size-3" /> : <Pause className="size-3" />}
+            </Button>
+            <Button variant="ghost" size="icon" className="size-6" disabled={entries.length === 0}
+              onClick={() => setConfirmClear(true)} title={t("taskbar.log.clear")}>
+              <Trash2 className="size-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className="size-6" disabled={entries.length === 0}
+              onClick={() => void exportLog()} title={t("taskbar.log.export")}>
+              <Download className="size-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className="size-6"
+              onClick={onToggleExpanded}
+              title={expanded ? t("taskbar.log.collapse") : t("taskbar.log.expand")}>
+              {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+            </Button>
           </div>
-        ) : (
-          entries.map((e) => {
-            const level = isErrorLine(e.line);
-            return (
-              <div
-                key={e.seq}
-                className={cn(
-                  "px-2 py-[1px] hover:bg-accent/30",
-                  level === "error" && "bg-destructive/10 text-destructive",
-                  level === "warning" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-                )}
-              >
-                {e.line}
-              </div>
-            );
-          })
+        </div>
+
+        {/* 日志内容：统一行高、语义折行、滚动条贴右缘 */}
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1 font-mono text-xs leading-6 dark:text-foreground"
+          style={{ wordBreak: "break-word", whiteSpace: "pre-wrap" }}
+        >
+          {entries.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              {emptyText ?? t("taskbar.log.empty")}
+            </div>
+          ) : (
+            entries.map((e) => {
+              const level = isErrorLine(e.line);
+              return (
+                <div
+                  key={e.seq}
+                  className={cn(
+                    "pl-2 pr-1 whitespace-pre-wrap",
+                    level === "error" && "bg-destructive/15 text-destructive dark:text-red-300",
+                    level === "warning" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                    !level && "hover:bg-accent/40",
+                  )}
+                >
+                  {e.line}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* 展开状态：右侧拖拽手柄 */}
+        {expanded && (
+          <div
+            className="absolute -right-1 top-0 bottom-0 z-10 flex w-2 cursor-col-resize items-center justify-center hover:bg-primary/25 active:bg-primary/40"
+            title={t("taskbar.log.resize")}
+            onMouseDown={onResizeStart}
+          >
+            <GripVertical className="size-3 text-muted-foreground" />
+          </div>
         )}
       </div>
 
-      {/* 展开状态下右侧拖拽手柄 */}
-      {expanded && (
-        <div
-          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
-          title={t("taskbar.log.resize")}
-          onMouseDown={onResizeStart}
-        >
-          <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-muted-foreground">
-            <GripVertical className="size-3" />
-          </div>
-        </div>
-      )}
-
-      {/* 清空确认弹窗 */}
+      {/* 清空确认 */}
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
         <AlertDialogContent className="sm:max-w-sm">
           <AlertDialogHeader>
@@ -233,10 +209,12 @@ export function LogView({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={doClear}>{t("taskbar.log.clear")}</AlertDialogAction>
+            <AlertDialogAction onClick={() => { onClear?.(); setConfirmClear(false); }}>
+              {t("taskbar.log.clear")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

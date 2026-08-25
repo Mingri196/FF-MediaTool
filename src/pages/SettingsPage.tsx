@@ -173,7 +173,7 @@ export function SettingsPage() {
 
         {/* 页脚版本信息 */}
         <div className="flex items-center justify-between pb-4 pt-1 text-xs text-muted-foreground">
-          <span>FF-MediaTool v0.18</span>
+          <span>FF-MediaTool v0.20</span>
           <Badge variant="outline">Tauri 2 + React + Rust</Badge>
         </div>
       </div>

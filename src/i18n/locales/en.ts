@@ -111,6 +111,7 @@ export const en: Record<I18nKey, string> = {
   "taskbar.stopping": "Stopping…",
   "taskbar.stop": "Stop",
   "taskbar.noTask": "No task",
+  "taskbar.status": "Status",
   "taskbar.eta": "{time} left",
   "taskbar.elapsed": "{time} elapsed",
   "taskbar.speed": "{speed}x",
@@ -344,6 +345,9 @@ export const en: Record<I18nKey, string> = {
 
   "drop.hint": "Release to import file",
   "drop.invalid": "Unsupported format: {names}",
+  "drop.acceptVideo": "Only video/image/subtitle files: {names}",
+  "drop.acceptAudio": "Only audio files: {names}",
+  "drop.noPaths": "Cannot read dropped file paths, use the file picker instead",
 
   /* ---------- Timeline ---------- */
   "timeline.start": "Start",

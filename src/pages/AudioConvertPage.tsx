@@ -209,7 +209,7 @@ export function AudioConvertPage() {
   }, [durationSec, splitEvery]);
 
   return (
-    <DropZone onFiles={([path]) => path && void pickInput(path)} className="h-full">
+    <DropZone onFiles={([path]) => path && void pickInput(path)} accept="audio" className="h-full">
       <div className="h-full overflow-y-auto">
         <div className="mx-auto max-w-5xl space-y-5 p-6">
         <div>
