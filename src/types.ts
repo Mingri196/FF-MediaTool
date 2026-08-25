@@ -5,6 +5,7 @@ export type ThemeMode = "light" | "dark" | "system";
 export type PageId =
   | "video-convert"
   | "audio-convert"
+  | "image-convert"
   | "video-clip"
   | "media-info"
   | "batch"

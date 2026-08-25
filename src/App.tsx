@@ -7,7 +7,7 @@ import { VideoConvertPage } from "@/pages/VideoConvertPage";
 import { VideoClipPage } from "@/pages/VideoClipPage";
 import { AudioConvertPage } from "@/pages/AudioConvertPage";
 import { MediaInfoPage } from "@/pages/MediaInfoPage";
-import { PlaceholderPage } from "@/pages/PlaceholderPage";
+import { ImageConvertPage } from "@/pages/ImageConvertPage";
 import { FirstRunDialog } from "@/components/ffmpeg/FirstRunDialog";
 import { I18nProvider, useI18n } from "@/i18n";
 import { SettingsProvider, useSettings } from "@/settings/SettingsProvider";
@@ -74,14 +74,16 @@ function Shell() {
                 return <BatchPage />;
               case "video-convert":
                 return <VideoConvertPage />;
+              case "image-convert":
+                return <ImageConvertPage />;
               case "video-clip":
-                        return <VideoClipPage />;
-                      case "audio-convert":
-                        return <AudioConvertPage />;
-                      case "media-info":
-                        return <MediaInfoPage />;
-                      default:
-                return <PlaceholderPage />;
+                return <VideoClipPage />;
+              case "audio-convert":
+                return <AudioConvertPage />;
+              case "media-info":
+                return <MediaInfoPage />;
+              default:
+                return <VideoConvertPage />;
             }
           }, [page]);
 

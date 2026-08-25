@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   Clapperboard,
   Film,
+  Image as ImageIcon,
   LayoutGrid,
   ListVideo,
   Scissors,
@@ -16,10 +17,11 @@ import type { PageId } from "@/types";
 export const NAV_ITEMS: {
   id: PageId;
   icon: typeof Film;
-  labelKey: "nav.videoConvert" | "nav.audioConvert" | "nav.videoClip" | "nav.mediaInfo" | "nav.batch" | "nav.settings";
+  labelKey: "nav.videoConvert" | "nav.audioConvert" | "nav.imageConvert" | "nav.videoClip" | "nav.mediaInfo" | "nav.batch" | "nav.settings";
 }[] = [
   { id: "video-convert", icon: Film, labelKey: "nav.videoConvert" },
   { id: "audio-convert", icon: AudioLines, labelKey: "nav.audioConvert" },
+  { id: "image-convert", icon: ImageIcon, labelKey: "nav.imageConvert" },
   { id: "video-clip", icon: Scissors, labelKey: "nav.videoClip" },
   { id: "media-info", icon: ListVideo, labelKey: "nav.mediaInfo" },
   { id: "batch", icon: LayoutGrid, labelKey: "nav.batch" },
@@ -32,10 +34,6 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
-/**
- * 模块一：基础外壳（左侧导航 + 中间内容区）。
- * 模块二将在此基础上扩展底部任务栏、头部状态区，形成完整三栏布局。
- */
 export function AppShell({ page, onNavigate, children }: AppShellProps) {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
@@ -44,32 +42,23 @@ export function AppShell({ page, onNavigate, children }: AppShellProps) {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-      {/* 左侧导航栏 */}
-      <aside
+      {/* 左侧导航 */}
+      <nav
         className={cn(
-          "flex shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200",
-          collapsed ? "w-14" : "w-52",
+          "flex shrink-0 flex-col border-r border-border bg-muted/30 transition-all duration-200",
+          collapsed ? "w-12" : "w-56",
         )}
       >
-        {/* Logo 区 */}
-        <div className="flex h-14 items-center gap-2.5 border-b border-border px-3.5">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Clapperboard className="size-4.5" />
-          </div>
+        {/* 应用标题 */}
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3">
+          <Clapperboard className="size-6 shrink-0 text-primary" />
           {!collapsed && (
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold leading-tight">
-                {t("app.name")}
-              </div>
-              <div className="truncate text-[11px] leading-tight text-muted-foreground">
-                {t("app.subtitle")}
-              </div>
-            </div>
+            <span className="truncate text-sm font-semibold">{t("app.name")}</span>
           )}
         </div>
 
         {/* 导航项 */}
-        <nav className="flex-1 space-y-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto py-2">
           {items.map((item) => {
             const Icon = item.icon;
             const active = page === item.id;
@@ -77,60 +66,37 @@ export function AppShell({ page, onNavigate, children }: AppShellProps) {
               <button
                 key={item.id}
                 type="button"
-                title={collapsed ? t(item.labelKey) : undefined}
                 onClick={() => onNavigate(item.id)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                  "flex w-full items-center gap-3 border-l-2 px-3 py-2.5 text-sm transition-colors hover:bg-accent",
                   active
-                    ? "bg-primary font-medium text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  collapsed && "justify-center px-0",
+                    ? "border-l-primary bg-accent font-medium text-foreground"
+                    : "border-l-transparent text-muted-foreground",
                 )}
+                title={collapsed ? t(item.labelKey) : undefined}
               >
-                <Icon className="size-4.5 shrink-0" />
-                {!collapsed && (
-                  <span className="truncate">{t(item.labelKey)}</span>
-                )}
+                <Icon className="size-5 shrink-0" />
+                {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
               </button>
             );
           })}
-        </nav>
-
-        {/* 底部折叠按钮 */}
-        <div className="border-t border-border p-2">
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            className="flex w-full items-center justify-center gap-2 rounded-md px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            <ChevronsIcon collapsed={collapsed} />
-            {!collapsed && <span>{t("app.collapseNav")}</span>}
-          </button>
         </div>
-      </aside>
 
-      {/* 主内容区：中间主操作区 + 底部固定任务栏（三栏布局） */}
+        {/* 折叠按钮 */}
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex shrink-0 items-center justify-center border-t border-border py-2 text-xs text-muted-foreground hover:bg-accent"
+        >
+          {collapsed ? "→" : "←"}
+        </button>
+      </nav>
+
+      {/* 右侧内容区 */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         <TaskBottomBar />
       </div>
     </div>
-  );
-}
-
-function ChevronsIcon({ collapsed }: { collapsed: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn("size-4 transition-transform", collapsed && "rotate-180")}
-    >
-      <path d="m11 17-5-5 5-5" />
-      <path d="m18 17-5-5 5-5" />
-    </svg>
   );
 }
