@@ -21,10 +21,10 @@ export type ResizeMode = "none" | "percent" | "fitWidth" | "fitHeight" | "fixed"
 
 export interface ImageResize {
   mode: ResizeMode;
-  value: number;      // percent (1-1000) or width/height in px
-  value2: number;     // second dimension (for fixed/cover)
+  value: number;
+  value2: number;
   dpi: number;
-  adaptMode: "fill" | "contain" | "cover"; // for custom mode
+  adaptMode: "none" | "fill" | "contain" | "cover";
 }
 
 export type RotateAngle = 0 | 90 | 180 | 270;
@@ -106,7 +106,7 @@ export function defaultImageParams(): ImageParams {
     gifFps: 10,
     gifLoop: 0,
     gifColors: 256,
-    resize: { mode: "none", value: 100, value2: 0, dpi: 72, adaptMode: "fill" },
+    resize: { mode: "none", value: 100, value2: 0, dpi: 72, adaptMode: "none" },
     rotate: 0,
     flipH: false,
     flipV: false,
