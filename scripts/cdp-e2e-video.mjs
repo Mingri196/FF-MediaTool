@@ -38,13 +38,12 @@ async function main() {
     return r.result?.value;
   };
 
-  // 注入事件监听
+  // 注入事件监听（强制重置，避免跨脚本残留事件污染）
   await evaljs(`(async () => {
-    if (!window.__evts) {
-      window.__evts = [];
-      const m = await import('/node_modules/.vite/deps/@tauri-apps_api_event.js');
-      window.__unlisten3 = await m.listen('task://event', (e) => window.__evts.push(e.payload));
-    }
+    try { if (window.__unlisten3) window.__unlisten3(); } catch {}
+    window.__evts = [];
+    const m = await import('/node_modules/.vite/deps/@tauri-apps_api_event.js');
+    window.__unlisten3 = await m.listen('task://event', (e) => window.__evts.push(e.payload));
     return 'ok';
   })()`);
 
@@ -58,15 +57,15 @@ async function main() {
   };
 
   const countEvts = () => evaljs(`window.__evts.length`);
-  const drainEvts = (n) => evaljs(`window.__evts.splice(0, ${n}).map(e => e.type === 'taskUpdated' ? ({t:'taskUpdated', status:e.task.status, id:e.task.id}) : ({t:e.type}))`);
+  const drainEvts = (n) => evaljs(`window.__evts.splice(0, ${n}).map(e => e.type === 'taskUpdated' ? ({t:'taskUpdated', status:e.task.status, id:e.task.id, name:e.task.name}) : ({t:e.type}))`);
 
-  const waitDone = async (timeoutMs = 60000) => {
+  const waitDone = async (timeoutMs = 60000, nameMatch) => {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
       const n = await countEvts();
       if (n > 0) {
         const batch = await drainEvts(n);
-        const done = batch.find((e) => e.t === "taskUpdated" && ["completed", "failed", "cancelled"].includes(e.status));
+        const done = batch.find((e) => e.t === "taskUpdated" && ["completed", "failed", "cancelled"].includes(e.status) && (nameMatch ? e.name === nameMatch : true));
         if (done) return done.status;
       }
       await SLEEP(300);
@@ -76,9 +75,14 @@ async function main() {
 
   const ffprobe = (file, entry) => {
     try {
-      const out = execSync(`ffprobe -v error -show_entries ${entry} -of default=noprint_wrappers=1:nokey=1 "${file}"`, { encoding: "utf8" });
+      // 正斜杠路径避免 Windows 混合 shell 下反斜杠被吞
+      const p = file.replace(/\\/g, "/");
+      const out = execSync(`ffprobe -v error -show_entries ${entry} -of default=noprint_wrappers=1:nokey=1 "${p}"`, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
       return out.trim();
-    } catch { return "ERR"; }
+    } catch (e) {
+      const cmd = e.cmd ?? "";
+      return "ERR|" + (e.stderr?.toString?.() ?? e.message).split("\n").slice(0, 2).join(" / ").slice(0, 120) + "|CMD:" + cmd.slice(-80);
+    }
   };
 
   // ============ 1. media_probe_basic ============
@@ -114,10 +118,15 @@ async function main() {
   await invoke("task_add", {
     task: { name: "M3 filters", args: args3.split(" "), inputPath: INPUT, outputPath: out3 },
   });
-  const st3 = await waitDone();
+  const st3 = await waitDone(60000, "M3 filters");
   console.log("status:", st3);
   if (st3 !== "completed") throw new Error("M3 FAILED");
-  const dims3 = ffprobe(out3, "stream=width,height");
+  // faststart 写 moov 需要几毫秒；retry 一次避免时序抖动
+  let dims3 = ffprobe(out3, "stream=width,height");
+  if (dims3.startsWith("ERR") || dims3.includes("moov")) {
+    await new Promise((r) => setTimeout(r, 500));
+    dims3 = ffprobe(out3, "stream=width,height");
+  }
   console.log("output dims:", dims3);
   // 几何：crop 640x352 → scale=1280:-2 → 1280x704 → transpose=1（90°转置互换宽高）→ 704x1280
   if (dim3Parse(dims3) !== "704x1280") throw new Error("M3 FAILED: 分辨率/裁剪不正确: " + dims3);
@@ -135,7 +144,7 @@ async function main() {
   await invoke("task_add", {
     task: { name: "M4 trim", args: args4.raw.split(" "), inputPath: INPUT, outputPath: out4 },
   });
-  const st4 = await waitDone();
+  const st4 = await waitDone(60000, "M4 trim");
   console.log("status:", st4);
   const dur4 = parseFloat(ffprobe(out4, "format=duration"));
   console.log("trim duration:", dur4);
@@ -153,7 +162,7 @@ async function main() {
   await invoke("task_add", {
     task: { name: "M5 concat", args: args5.split(" "), inputPath: INPUT, outputPath: out5 },
   });
-  const st5 = await waitDone();
+  const st5 = await waitDone(60000, "M5 concat");
   console.log("status:", st5);
   const dur5 = parseFloat(ffprobe(out5, "format=duration"));
   console.log("concat duration:", dur5);
@@ -178,7 +187,7 @@ async function main() {
   await invoke("task_add", {
     task: { name: "M6 copy", args: a6.raw, inputPath: INPUT, outputPath: out6 },
   });
-  const st6 = await waitDone();
+  const st6 = await waitDone(60000, "M6 copy");
   console.log("status:", st6);
   if (st6 !== "completed") throw new Error("M6 FAILED");
   if (!existsSync(out6)) throw new Error("M6 FAILED: 无输出");
