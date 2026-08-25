@@ -11,24 +11,17 @@ import { useTasks } from "@/tasks/TaskProvider";
 import { formatMs } from "@/lib/format";
 import { analyzeFfmpegError } from "@/lib/ffmpegErrors";
 
-/**
- * 底部固定任务栏（三栏布局的第三栏）：
- * - 当前任务实时进度：百分比条 + 已处理时长 + 剩余预估 + 处理速度
- * - 开始（添加任务）/ 停止控制按钮
- * - 实时日志输出框（自动滚动、暂停、清空、导出）
- */
 export function TaskBottomBar() {
   const { t } = useI18n();
   const { tasks, queueIds, currentId, stopping, logs, guardAddTask, stopTask, clearLog, statusLabel } =
     useTasks();
   const [quickOpen, setQuickOpen] = useState(false);
+  const [logExpanded, setLogExpanded] = useState(false);
 
   const current = currentId ? tasks.get(currentId) ?? null : null;
-  // 日志目标：优先当前运行任务，其次队列首个，再其次最近结束的任务
   const logTaskId = useMemo(() => {
     if (currentId) return currentId;
     if (queueIds.length > 0) return queueIds[0];
-    // 最近结束任务：按 finishedAt 取最新
     let best: { id: string; at: number } | null = null;
     for (const task of tasks.values()) {
       if (task.finishedAt && (!best || task.finishedAt > best.at)) {
@@ -45,29 +38,22 @@ export function TaskBottomBar() {
   const queuedCount = queueIds.length;
 
   const { percent, timeMs, durationMs, speed, etaMs } = current?.progress ?? {
-    percent: -1,
-    timeMs: 0,
-    durationMs: 0,
-    speed: 0,
-    etaMs: -1,
+    percent: -1, timeMs: 0, durationMs: 0, speed: 0, etaMs: -1,
   };
-  const determinate = percent >= 0;
+  const determinate = percent >= 0 && durationMs > 0;
 
   return (
-    <div className="flex h-44 shrink-0 flex-col border-t border-border bg-card">
-      {/* 顶行：任务信息 + 控制按钮 */}
-      <div className="flex h-16 shrink-0 items-center gap-4 border-b border-border px-4">
-        {/* 状态区 */}
-        <div className="min-w-0 flex-1">
+    <div className={cn(
+      "flex shrink-0 flex-col border-t border-border bg-background transition-all",
+      logExpanded ? "flex-1 min-h-[200px]" : "h-[200px]",
+    )}>
+      {/* 顶行：进度信息 + 控制按钮 */}
+      <div className="flex shrink-0 items-center gap-4 px-4 py-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {current ? (
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span
-                  className="truncate text-sm font-medium"
-                  title={current.outputPath}
-                >
-                  {current.name}
-                </span>
+                <span className="truncate text-sm font-medium">{current.name}</span>
                 <Badge
                   variant={
                     current.status === "failed"
@@ -77,6 +63,7 @@ export function TaskBottomBar() {
                         : "secondary"
                   }
                   className={cn(
+                    "shrink-0",
                     running && "bg-blue-600 text-white",
                     current.status === "queued" && "bg-muted text-muted-foreground",
                   )}
@@ -85,7 +72,6 @@ export function TaskBottomBar() {
                 </Badge>
                 {stopping && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
               </div>
-              {/* 统计行 */}
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                 <span>{t("taskbar.percent", { percent: Math.round(percent) })}</span>
                 {timeMs > 0 && <span>{t("taskbar.elapsed", { time: formatMs(timeMs) })}</span>}
@@ -106,41 +92,33 @@ export function TaskBottomBar() {
             </div>
           )}
         </div>
-
-        {/* 控制按钮区 */}
         <div className="flex shrink-0 items-center gap-2">
           <Button size="sm" onClick={() => setQuickOpen(true)}>
-            <Plus className="size-4" />
-            {t("batch.add")}
+            <Plus className="size-4" />{t("batch.add")}
           </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={!running}
-            onClick={() => currentId && void stopTask(currentId)}
-          >
-            <Square className="size-3.5 fill-current" />
-            {t("taskbar.stop")}
+          <Button size="sm" variant="destructive" disabled={!running}
+            onClick={() => currentId && void stopTask(currentId)}>
+            <Square className="size-3.5 fill-current" />{t("taskbar.stop")}
           </Button>
         </div>
       </div>
 
-      {/* 进度条（当前任务） */}
-      <div className="shrink-0 px-4 pt-2">
+      {/* 进度条 */}
+      <div className="shrink-0 px-4">
         {running && determinate ? (
-          <Progress value={percent} className="h-1.5" />
+          <Progress value={percent} className="h-1" />
         ) : running ? (
-          <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="relative h-1 overflow-hidden rounded-full bg-muted">
             <div className="absolute inset-y-0 w-1/3 animate-indeterminate rounded-full bg-primary/70" />
           </div>
         ) : (
-          <div className="h-1.5" />
+          <div className="h-1" />
         )}
       </div>
 
-      {/* 错误分析（失败任务） */}
+      {/* 错误分析 */}
       {logTask?.status === "failed" && logEntries.length > 0 && (
-        <div className="shrink-0 px-4 pb-1">
+        <div className="shrink-0 px-4 pb-1 pt-1">
           {(() => {
             const stderr = logEntries.map((e) => e.line).join("\n");
             const suggestions = analyzeFfmpegError(stderr);
@@ -168,6 +146,8 @@ export function TaskBottomBar() {
           onClear={logTaskId ? () => clearLog(logTaskId) : undefined}
           emptyText={logTask ? t("taskbar.log.empty") : t("taskbar.noTask")}
           className="h-full rounded-md border border-border"
+          expanded={logExpanded}
+          onExpandedChange={setLogExpanded}
         />
       </div>
 

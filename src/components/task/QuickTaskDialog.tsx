@@ -139,13 +139,13 @@ export function QuickTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{t("quick.title")}</DialogTitle>
           <DialogDescription>{t("quick.desc")}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
           {/* 输入文件 */}
           <div className="space-y-1.5">
             <Label>{t("quick.input")}</Label>
@@ -173,14 +173,14 @@ export function QuickTaskDialog({
                   type="button"
                   variant={profileIdx === i ? "default" : "outline"}
                   size="sm"
-                  className="justify-start"
+                  className="justify-start h-auto min-h-[2.25rem] whitespace-normal text-left"
                   onClick={() => {
                     setProfileIdx(i);
                     refreshOutput(input, i);
                   }}
                 >
-                  <FileVideo className="size-3.5 shrink-0" />
-                  <span className="truncate">{t(p.labelKey)}</span>
+                  <FileVideo className="size-3.5 shrink-0 mt-0.5" />
+                  <span className="break-words">{t(p.labelKey)}</span>
                 </Button>
               ))}
             </div>
@@ -207,7 +207,7 @@ export function QuickTaskDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t border-border pt-3 mt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t("common.cancel")}
           </Button>

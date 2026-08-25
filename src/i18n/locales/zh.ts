@@ -122,6 +122,7 @@ export const zh = {
   "taskbar.log.resume": "跟随",
   "taskbar.log.clear": "清空",
   "taskbar.log.export": "导出",
+  "taskbar.log.resize": "拖拽调整高度",
   "taskbar.log.empty": "暂无日志",
   "taskbar.log.expand": "展开",
   "taskbar.log.collapse": "收起",
@@ -437,6 +438,10 @@ export const zh = {
   "info.colorPrimaries": "色彩原色",
   "info.colorTransfer": "色彩传输",
   "info.chroma": "色度采样位置",
+  "info.startTime": "起始时间",
+  "info.codedResolution": "编码尺寸",
+  "info.bitDepth": "位深度",
+  "info.maxBitrate": "最大码率",
   "info.fps": "帧率",
   "info.nbFrames": "总帧数",
   "info.hasBFrames": "B 帧数量",
@@ -447,8 +452,6 @@ export const zh = {
   "info.sampleRate": "采样率",
   "info.channels": "声道",
   "info.sampleFmt": "采样格式",
-  "info.bitDepth": "位深",
-  "info.maxBitrate": "最大码率",
 
   /* ---------- 音频音量/处理 ---------- */
   "aef.volume": "音量",

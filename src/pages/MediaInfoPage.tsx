@@ -193,6 +193,7 @@ export function MediaInfoPage() {
                     [t("info.bitrate"), fmtBitrate(info.format.bitRate ? Math.round(info.format.bitRate / 1000) : null)],
                     [t("info.nbStreams"), String(info.format.nbStreams)],
                     [t("info.filename"), info.format.filename],
+                    [t("info.startTime"), formatMs(Math.round(info.format.startTime * 1000))],
                   ]} />
                   <Separator className="my-3" />
                   <h4 className="mb-2 text-sm font-medium">{t("info.metadata")}</h4>
@@ -232,7 +233,9 @@ export function MediaInfoPage() {
                       [t("info.profile"), currentVideo.profile],
                       [t("info.level"), String(currentVideo.level)],
                       [t("info.resolution"), `${currentVideo.width} × ${currentVideo.height}`],
+                      [t("info.codedResolution"), `${currentVideo.codedWidth} × ${currentVideo.codedHeight}`],
                       [t("info.pixFmt"), currentVideo.pixFmt],
+                      [t("info.bitDepth"), currentVideo.bitsPerRawSample !== null ? String(currentVideo.bitsPerRawSample) : "—"],
                       [t("info.colorSpace"), currentVideo.colorSpace || "—"],
                       [t("info.colorPrimaries"), currentVideo.colorPrimaries || "—"],
                       [t("info.colorTransfer"), currentVideo.colorTransfer || "—"],
@@ -245,6 +248,7 @@ export function MediaInfoPage() {
                       [t("info.sar"), currentVideo.sampleAspectRatio || "—"],
                       [t("info.dar"), currentVideo.displayAspectRatio || "—"],
                       [t("info.fieldOrder"), currentVideo.fieldOrder],
+                      [t("info.duration"), formatMs(Math.round(currentVideo.duration * 1000))],
                     ]} />
                   )}
                 </CardContent>
@@ -283,6 +287,7 @@ export function MediaInfoPage() {
                       [t("info.bitrate"), fmtBitrate(currentAudio.bitRate ? Math.round(currentAudio.bitRate / 1000) : null)],
                       [t("info.maxBitrate"), fmtBitrate(currentAudio.maxBitRate ? Math.round(currentAudio.maxBitRate / 1000) : null)],
                       [t("info.nbFrames"), currentAudio.nbFrames !== null ? String(currentAudio.nbFrames) : "—"],
+                      [t("info.duration"), formatMs(Math.round(currentAudio.duration * 1000))],
                     ]} />
                   )}
                 </CardContent>

@@ -121,7 +121,8 @@ export const en: Record<I18nKey, string> = {
   "taskbar.log.resume": "Follow",
   "taskbar.log.clear": "Clear",
   "taskbar.log.export": "Export",
-  "taskbar.log.empty": "No log yet",
+    "taskbar.log.resize": "Drag to resize",
+    "taskbar.log.empty": "No log entries",
   "taskbar.log.expand": "Expand",
   "taskbar.log.collapse": "Collapse",
   "taskbar.log.totalLines": "{count} lines",
@@ -436,6 +437,9 @@ export const en: Record<I18nKey, string> = {
   "info.colorPrimaries": "Color primaries",
   "info.colorTransfer": "Color transfer",
   "info.chroma": "Chroma location",
+  "info.startTime": "Start time",
+  "info.codedResolution": "Coded size",
+  "info.bitDepth": "Bit depth",
   "info.fps": "Frame rate",
   "info.nbFrames": "Total frames",
   "info.hasBFrames": "B-frames",
@@ -446,7 +450,6 @@ export const en: Record<I18nKey, string> = {
   "info.sampleRate": "Sample rate",
   "info.channels": "Channels",
   "info.sampleFmt": "Sample format",
-  "info.bitDepth": "Bit depth",
   "info.maxBitrate": "Max bitrate",
 
   /* ---------- Audio FX ---------- */
