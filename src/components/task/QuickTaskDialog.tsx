@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, FileVideo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useI18n } from "@/i18n";
+import { useSettings } from "@/settings/SettingsProvider";
+import { api } from "@/lib/tauri";
 import { deriveOutputPath, basename } from "@/lib/format";
 import type { NewTask } from "@/tasks/types";
 
@@ -76,18 +78,21 @@ export function QuickTaskDialog({
   onAdd: (task: NewTask) => void;
 }) {
   const { t } = useI18n();
+  const { settings } = useSettings();
   const [input, setInput] = useState<string | null>(null);
   const [profileIdx, setProfileIdx] = useState(0);
   const [output, setOutput] = useState("");
 
   const profile = PROFILES[profileIdx];
 
-  // 输入或处理方式变化时自动重新生成输出路径（若用户未手动改过）
+  // 输入或处理方式变化时自动重新生成输出路径（使用默认输出路径）
   const [outputTouched, setOutputTouched] = useState(false);
-  const refreshOutput = (inp: string | null, idx: number) => {
+  const refreshOutput = async (inp: string | null, idx: number) => {
     setOutputTouched(false);
     if (!inp) return setOutput("");
-    setOutput(deriveOutputPath(inp, PROFILES[idx].ext));
+    const cfgDir = settings?.outputPaths?.quickTask || (await api.getOptDir());
+    const baseInput = cfgDir + "/" + basename(inp);
+    setOutput(deriveOutputPath(baseInput, PROFILES[idx].ext));
   };
 
   const pickInput = async () => {
@@ -102,17 +107,6 @@ export function QuickTaskDialog({
       // 记录最近输入目录（App 层监听后写入设置）
       const dir = picked.replace(/[\\/][^\\/]+$/, "");
       window.dispatchEvent(new CustomEvent("ffmt:last-input-dir", { detail: dir }));
-    }
-  };
-
-  const pickOutput = async () => {
-    const picked = await saveDialog({
-      title: t("quick.output"),
-      defaultPath: output || undefined,
-    });
-    if (typeof picked === "string" && picked) {
-      setOutput(picked);
-      setOutputTouched(true);
     }
   };
 
@@ -199,9 +193,6 @@ export function QuickTaskDialog({
                   setOutputTouched(true);
                 }}
               />
-              <Button variant="outline" size="icon" onClick={() => void pickOutput()} title={t("quick.browseOutput")}>
-                <FolderOpen className="size-4" />
-              </Button>
             </div>
             {outputHint && <p className="text-xs text-muted-foreground">{outputHint}</p>}
           </div>

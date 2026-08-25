@@ -60,11 +60,12 @@ pub struct OutputPaths {
     pub audio_convert: Option<String>,
     pub image_convert: Option<String>,
     pub video_clip: Option<String>,
+    pub quick_task: Option<String>,
 }
 
 impl Default for OutputPaths {
     fn default() -> Self {
-        Self { video_convert: None, audio_convert: None, image_convert: None, video_clip: None }
+        Self { video_convert: None, audio_convert: None, image_convert: None, video_clip: None, quick_task: None }
     }
 }
 

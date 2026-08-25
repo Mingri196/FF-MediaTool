@@ -27,6 +27,7 @@ export interface OutputPaths {
   audioConvert?: string | null;
   imageConvert?: string | null;
   videoClip?: string | null;
+  quickTask?: string | null;
 }
 
 export interface AppSettings {

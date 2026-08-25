@@ -38,7 +38,7 @@ export function SettingsPage() {
 
   const resetDefault = () => {
     if (confirm(t("settings.outputPath.resetConfirm"))) {
-      setLocalPaths({ videoConvert: null, audioConvert: null, imageConvert: null, videoClip: null });
+      setLocalPaths({ videoConvert: null, audioConvert: null, imageConvert: null, videoClip: null, quickTask: null });
     }
   };
 
@@ -110,6 +110,11 @@ export function SettingsPage() {
                     <Label className="text-xs">{t("settings.outputPath.videoClip")}</Label>
                     <Input value={localPaths.videoClip ?? ""} onChange={(e) => setLocalPaths({ ...localPaths, videoClip: e.target.value || null })} />
                     <Button variant="outline" size="icon" className="size-6" onClick={async () => { const d = await open({ directory: true, title: t("settings.outputPath.videoClip") }); if (typeof d === "string") setLocalPaths({ ...localPaths, videoClip: d }); }}><FolderOpen className="size-3" /></Button>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("settings.outputPath.quickTask")}</Label>
+                    <Input value={localPaths.quickTask ?? ""} onChange={(e) => setLocalPaths({ ...localPaths, quickTask: e.target.value || null })} />
+                    <Button variant="outline" size="icon" className="size-6" onClick={async () => { const d = await open({ directory: true, title: t("settings.outputPath.quickTask") }); if (typeof d === "string") setLocalPaths({ ...localPaths, quickTask: d }); }}><FolderOpen className="size-3" /></Button>
                   </div>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -227,7 +232,7 @@ export function SettingsPage() {
 
         {/* 页脚版本信息 */}
         <div className="flex items-center justify-between pb-4 pt-1 text-xs text-muted-foreground">
-          <span>FF-MediaTool v0.49 Beta</span>
+          <span>FF-MediaTool v0.51 Beta</span>
           <Badge variant="outline">Tauri 2 + React + Rust</Badge>
         </div>
       </div>

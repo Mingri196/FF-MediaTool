@@ -81,6 +81,7 @@ export const zh = {
   "settings.outputPath.audioConvert": "音频转换输出路径",
   "settings.outputPath.imageConvert": "图片转换输出路径",
   "settings.outputPath.videoClip": "视频剪辑输出路径",
+  "settings.outputPath.quickTask": "快速任务输出路径",
   "settings.outputPath.save": "保存",
   "settings.outputPath.cancel": "取消",
   "settings.outputPath.resetDefault": "恢复默认",

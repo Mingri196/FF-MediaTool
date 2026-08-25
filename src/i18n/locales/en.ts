@@ -80,6 +80,7 @@ export const en: Record<I18nKey, string> = {
   "settings.outputPath.audioConvert": "Audio Convert Output Path",
   "settings.outputPath.imageConvert": "Image Convert Output Path",
   "settings.outputPath.videoClip": "Video Clip Output Path",
+  "settings.outputPath.quickTask": "Quick Task Output Path",
   "settings.outputPath.save": "Save",
   "settings.outputPath.cancel": "Cancel",
   "settings.outputPath.resetDefault": "Reset to Default",

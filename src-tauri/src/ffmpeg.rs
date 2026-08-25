@@ -4,9 +4,6 @@
 
 use std::time::Duration;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-
 use serde::Serialize;
 use tauri::AppHandle;
 use tokio::process::Command;
@@ -50,13 +47,11 @@ fn parse_version(first_line: &str) -> Option<String> {
 
 /// 运行 `<bin> -version` 并解析版本；返回 (完整首行, 版本号)
 async fn probe_binary(bin_path: &str, bin_name: &str) -> Option<(String, String)> {
-    let mut cmd = Command::new(bin_path);
-    cmd.args(["-version"]);
-    #[cfg(target_os = "windows")]
-    {
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-    let result = timeout(VERSION_TIMEOUT, cmd.output()).await;
+    let result = timeout(
+        VERSION_TIMEOUT,
+        Command::new(bin_path).args(["-version"]).output(),
+    )
+    .await;
     let out = match result {
         Ok(Ok(o)) if o.status.success() => o,
         _ => return None,
