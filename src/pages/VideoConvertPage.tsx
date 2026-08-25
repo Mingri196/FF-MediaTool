@@ -74,7 +74,7 @@ export function VideoConvertPage() {
         }));
       if (typeof picked !== "string" || !picked) return;
       setInput(picked);
-      // 记忆最近输入目录
+      // 记忆最近输入目录（仅用于快速对话框）
       const dir = picked.replace(/[\\/][^\\/]+$/, "");
       if (dir !== lastOutputDir) {
         window.dispatchEvent(new CustomEvent("ffmt:last-input-dir", { detail: dir }));
@@ -133,12 +133,12 @@ export function VideoConvertPage() {
     if (defaultOutput && !output) setOutput(defaultOutput);
   }, [defaultOutput]);
 
-  // 输入变化时记忆输出目录
+  // 完成任务后记忆输出目录
   useEffect(() => {
     if (output) {
       const dir = output.replace(/[\\/][^\\/]+$/, "");
       if (dir && dir !== settings?.lastOutputDir) {
-        update({ lastOutputDir: dir });
+        // 已由任务完成回调保存，此处不再重复保存
       }
     }
   }, [output]); // eslint-disable-line react-hooks/exhaustive-deps

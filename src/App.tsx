@@ -29,25 +29,32 @@ function Shell() {
     applyAccent(accent);
   }, [accent]);
 
-  // 设置加载完成后：检测 FFmpeg，判断是否需要首次引导
-  useEffect(() => {
-    if (!settings) return;
-    let cancelled = false;
-    api
-      .detectFfmpeg()
-      .then((s) => {
-        if (cancelled) return;
-        if (!s.ffmpeg && !settings.hasCompletedFirstRun) {
-          setShowFirstRun(true);
-        }
-      })
-      .catch((e) => console.error("FFmpeg 检测失败", e));
-    return () => {
-      cancelled = true;
-    };
-    // 只在首次引导标记变化时重跑（检测本身轻量）
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.hasCompletedFirstRun]);
+  // 设置加载完成后：仅首次启动检测 FFmpeg，检测结果自动保存
+    useEffect(() => {
+      if (!settings) return;
+      // 如果已完成首次引导，不再检测
+      if (settings.hasCompletedFirstRun) return;
+      let cancelled = false;
+      api
+        .detectFfmpeg()
+        .then((s) => {
+          if (cancelled) return;
+          // 标记首次引导完成并保存检测到的路径
+                    update({
+                      hasCompletedFirstRun: true,
+                      ffmpegPath: s.ffmpeg?.path ?? null,
+                      ffprobePath: s.ffprobe?.path ?? null,
+                    });
+          if (!s.ffmpeg) {
+            setShowFirstRun(true);
+          }
+        })
+        .catch((e) => console.error("FFmpeg 检测失败", e));
+      return () => {
+        cancelled = true;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [settings?.hasCompletedFirstRun]);
 
   // 记录最近输入目录（快速任务对话框派发的事件）
   useEffect(() => {

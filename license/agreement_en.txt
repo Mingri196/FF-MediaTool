@@ -1,0 +1,91 @@
+FF-MediaTool End-User License Agreement
+
+Copyright (C) 2026 Mingri. All rights reserved.
+
+Last updated: 2026-08-26
+Version status: This is a beta release. Features may change, and stability is not guaranteed.
+
+1. Overview
+
+   FF-MediaTool ("the Software") is a desktop application for audio, video,
+   and image conversion based on FFmpeg. By installing, copying, or otherwise
+   using the Software, you agree to be bound by the terms of this Agreement.
+   If you do not agree, do not install or use the Software.
+
+2. License Grant
+
+   The Software is licensed, not sold, to you for personal, non-commercial use
+   free of charge. You may install and use the Software on your personal
+   devices. You may NOT:
+   (a) Sell, rent, lease, or sublicense the Software;
+   (b) Use the Software for any commercial purpose without prior written
+       permission from the author;
+   (c) Modify, decompile, or reverse engineer the Software, except to the
+          extent permitted by applicable law;
+          provided that this clause does not restrict rights granted under the
+          licenses of the open-source components listed in Section 4.
+
+3. Intellectual Property
+
+   All rights, title, and interest in the Software, including but not limited
+   to the source code, user interface, and documentation, remain the property
+   of the author.
+
+4. Open-Source Components
+
+   The Software incorporates the following open-source components:
+   - FFmpeg (licensed under the GNU General Public License version 2 or
+     later, or the GNU Lesser General Public License version 2.1 or later).
+     Source code for FFmpeg is available at https://ffmpeg.org.
+   - Tauri (licensed under the Apache License, Version 2.0 or the MIT
+     License). Source code is available at https://tauri.app.
+   - Other open-source libraries as listed in the documentation.
+
+   These components are governed by the terms of their respective licenses.
+   The source code for each component is available from its official
+   repository.
+
+5. Disclaimer of Warranty
+
+   THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHOR BE LIABLE FOR ANY DATA LOSS, BUSINESS INTERRUPTION, OR OTHER
+   DAMAGES ARISING FROM THE USE OF OR INABILITY TO USE THE SOFTWARE.
+
+6. Limitation of Liability
+
+   In no event shall the author be liable for any indirect, incidental,
+   special, or consequential damages, including but not limited to loss of
+   data, loss of profits, or equipment damage, arising out of or in
+   connection with the Software or the use or other dealings in the
+   Software.
+
+7. User Responsibility
+
+   You are solely responsible for the content you process using the
+   Software. The author is not responsible for any copyright infringement,
+   data loss, or other consequences resulting from your use of the Software.
+
+8. Termination
+
+   This Agreement is effective until terminated. Upon violation of any
+   term, your license is automatically terminated. You must destroy all
+   copies of the Software upon termination.
+
+9. Changes to This Agreement
+
+   The author reserves the right to modify this Agreement at any time.
+   Continued use of the Software after changes are posted constitutes
+   acceptance of the new terms.
+
+10. Governing Law
+
+    This Agreement shall be governed by the laws of the People's Republic
+    of China.
+
+Contact: For questions about this Agreement, please open an issue on GitHub.
+https://github.com/Mingri196/FF-MediaTool/issues
+
+------------------------------------------------------------------------
+END OF AGREEMENT
