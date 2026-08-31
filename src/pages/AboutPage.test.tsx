@@ -1,0 +1,68 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, fireEvent, cleanup } from "@testing-library/react";
+import { AboutPage, GITHUB_URL, MIT_LICENSE_URL, APP_VERSION } from "./AboutPage";
+
+const openUrlMock = vi.fn();
+
+vi.mock("@/i18n", () => ({
+  useI18n: () => ({ t: (k: string) => k }),
+}));
+
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: async (url: string) => openUrlMock(url),
+}));
+
+afterEach(() => cleanup());
+beforeEach(() => openUrlMock.mockClear());
+
+const renderAbout = (onBack = vi.fn()) => render(<AboutPage onBack={onBack} />);
+
+describe("AboutPage 关于详细页", () => {
+  it("展示软件大标题、动态版本号、技术栈说明", () => {
+    const { getByText } = renderAbout();
+    expect(getByText("FF-MediaTool")).not.toBeNull();
+    expect(getByText(APP_VERSION)).not.toBeNull();
+    expect(getByText("about.stackLine")).not.toBeNull();
+    expect(getByText("about.versionLine")).not.toBeNull();
+  });
+
+  it("GitHub 链接存在且可点击（调用系统浏览器）", () => {
+    const { getByTestId } = renderAbout();
+    const link = getByTestId("about-repo-link");
+    expect(link.textContent).toBe(GITHUB_URL);
+    fireEvent.click(link);
+    expect(openUrlMock).toHaveBeenCalledWith(GITHUB_URL);
+  });
+
+  it("展示 MIT 许可证说明与「查看完整 MIT 协议」按钮；点击打开 MIT 外部链接（不弹内部弹窗）", () => {
+    const { getByText } = renderAbout();
+    expect(getByText("MIT License")).not.toBeNull();
+    expect(getByText("about.mitDesc")).not.toBeNull();
+    expect(getByText("about.mitFull")).not.toBeNull();
+    // 点击「查看完整 MIT 协议」→ 调用系统浏览器打开 MIT 专属外部链接
+    fireEvent.click(getByText("about.mitFull"));
+    expect(openUrlMock).toHaveBeenCalledWith(MIT_LICENSE_URL);
+    // 不再打开仓库主页
+    expect(openUrlMock).not.toHaveBeenCalledWith(GITHUB_URL);
+    // 不在软件内部弹出协议弹窗（无 Dialog 渲染）
+    expect(document.querySelector("[data-slot=dialog-content]")).toBeNull();
+  });
+
+  it("展示功能简述", () => {
+    const { getByText } = renderAbout();
+    expect(getByText("about.features")).not.toBeNull();
+    expect(getByText("about.featuresDesc")).not.toBeNull();
+  });
+
+  it("返回按钮触发 onBack", () => {
+    const onBack = vi.fn();
+    const { getByText } = renderAbout(onBack);
+    fireEvent.click(getByText("about.back"));
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it("版本常量与页面展示一致（v0.87 Beta）", () => {
+    expect(APP_VERSION).toBe("v0.87 Beta");
+  });
+});

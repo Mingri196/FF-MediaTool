@@ -98,7 +98,7 @@ impl TaskManager {
 
     /// 调度主循环：串行执行队列中的任务
     pub async fn pump(self: Arc<Self>, app: AppHandle) {
-        loop {
+        'pump: loop {
             // 取下一个任务（队首 + 当前空闲）
             let next = {
                 let mut g = self.inner.lock().await;
@@ -155,7 +155,7 @@ impl TaskManager {
                         t.error = Some(format!("无法启动 ffmpeg 进程: {e}"));
                         runner::emit_task_event(&app, &t);
                         self.finish_task(&app, &t.id, &t).await;
-                        continue;
+                        continue 'pump;
                     }
                 },
                 Err(e) => {
@@ -164,7 +164,7 @@ impl TaskManager {
                     t.error = Some(e);
                     runner::emit_task_event(&app, &t);
                     self.finish_task(&app, &t.id, &t).await;
-                    continue;
+                    continue 'pump;
                 }
             };
 
@@ -189,10 +189,18 @@ impl TaskManager {
                     }
                     c
                 }
-                None => continue,
+                None => continue 'pump,
             };
 
-            // 执行（child 所有权归 run_task；stop 通过登记的 PID 击杀进程树）
+            // 运行日志输出完整 ffmpeg 命令，便于排查（PRD：完整命令输出在运行日志窗口）
+            {
+                let mut cmdline = String::from("ffmpeg");
+                for a in &task_to_run.args {
+                    cmdline.push(' ');
+                    cmdline.push_str(a);
+                }
+                runner::emit_log(&app, &task_to_run.id, &cmdline, "info");
+            }
             let (code, err) = runner::run_task(&app, &mut task_to_run, child).await;
 
             // 判定最终状态

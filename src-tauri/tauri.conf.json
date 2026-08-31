@@ -1,37 +1,51 @@
 {
   "productName": "FF-MediaTool",
-  "version": "0.53.0",
+  "version": "0.87.0",
   "identifier": "com.ffmediatool.app",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
-  },
+      "beforeDevCommand": "npm run dev",
+      "devUrl": "http://localhost:1420",
+      "beforeBuildCommand": "npm run build",
+      "frontendDist": "../dist"
+        },
   "app": {
-    "windows": [
-      {
-        "title": "FF-MediaTool v0.53 Beta",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 960,
-        "minHeight": 600,
-        "center": true,
-        "resizable": true,
-        "visible": true,
-        "dragDropEnabled": true
+        "withGlobalTauri": true,
+        "windows": [
+                  {
+                    "title": "FF-MediaTool v0.87 Beta",
+                    "width": 1280,
+                    "height": 800,
+                    "minWidth": 960,
+                    "minHeight": 600,
+                    "center": true,
+                    "resizable": true,
+                    "visible": true,
+                    "dragDropEnabled": true,
+                    "decorations": false,
+                    "transparent": true
+                  }
+                ],
+      "security": {
+        "csp": null,
+        "assetProtocol": {
+          "enable": true,
+          "scope": ["$RESOURCE/Background/**"]
+        }
       }
-    ],
-    "security": {
-      "csp": null
-    }
-  },
+    },
   "bundle": {
-      "active": true,
-      "targets": "nsis",
-      "icon": [
-        "FF-MediaTool.ico"
-      ],
-      "license": "license.txt"
-    }
+        "active": true,
+        "targets": "nsis",
+        "icon": [
+              "icons/icon.ico"
+            ],
+        "license": "license.txt",
+        "windows": {
+                "nsis": {
+                  "languages": ["SimpChinese", "English"],
+                  "displayLanguageSelector": true,
+                  "installerHooks": "windows/installer-hooks.nsh"
+                }
+              }
+      }
 }

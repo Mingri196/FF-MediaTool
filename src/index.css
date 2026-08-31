@@ -122,9 +122,56 @@
     @apply border-border outline-ring/50;
     }
   body {
-    @apply bg-background text-foreground;
-    }
+    @apply text-foreground;
+    /* 透明窗口（decorations:false + transparent:true）：
+       背景色由 shell-root 按主题/自定义背景条件提供，body 保持透明 */
+    background: transparent;
+  }
   html {
     @apply font-sans;
-    }
+    background: transparent;
+  }
+}
+
+/* —— 自定义背景开启时的半透明磨砂（条件类 .bg-glass-enabled 由 AppShell 依据设置注入）——
+   仅当开启自定义背景才生效；关闭时无此规则，面板保持不透明主题底色。
+   unlayered 规则优先于 utilities 层的 bg-card/bg-background。
+   透明度由 AppShell 注入的 CSS 变量驱动：
+   --panel-alpha（板块透明度滑块，默认 1=不透明）、--chrome-alpha（侧边栏/日志滑块，默认 1）。 */
+.bg-glass-enabled [data-slot="card"] {
+  background-color: color-mix(
+    in oklab,
+    var(--color-card) calc(var(--panel-alpha, 1) * 100%),
+    transparent
+  );
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  backdrop-filter: blur(12px) saturate(1.15);
+}
+.bg-glass-enabled [data-slot="taskbar"],
+.bg-glass-enabled [data-slot="sidebar"],
+.bg-glass-enabled [data-slot="titlebar"] {
+  background-color: color-mix(
+    in oklab,
+    var(--color-background) calc(var(--chrome-alpha, 1) * 100%),
+    transparent
+  );
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  backdrop-filter: blur(12px) saturate(1.15);
+}
+/* 面板效果=透明：关闭高斯模糊，底层背景（图片/视频）完整清晰透出；半透明底色/边框保留 */
+.bg-glass-enabled[data-panel-effect="transparent"] [data-slot="card"],
+.bg-glass-enabled[data-panel-effect="transparent"] [data-slot="taskbar"],
+.bg-glass-enabled[data-panel-effect="transparent"] [data-slot="sidebar"],
+.bg-glass-enabled[data-panel-effect="transparent"] [data-slot="titlebar"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* —— 自定义图库弹窗：支持用户手动拖拽缩放（右下角手柄）——
+   配合 DialogContent 上的 data-resizable 使用；resize:both 提供原生缩放手柄。 */
+[data-slot="dialog-content"][data-resizable] {
+  resize: both;
+  overflow: auto;
+  min-width: 480px;
+  min-height: 320px;
 }

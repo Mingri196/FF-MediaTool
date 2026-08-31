@@ -4,11 +4,17 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
+import { registerDialogClose } from "@/lib/dialogRegistry"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+function Dialog({ open, onOpenChange, ...props }: DialogPrimitive.Root.Props) {
+  // 打开时注册到全局弹窗栈，ESC 快捷键据此关闭本弹窗
+  React.useEffect(() => {
+    if (!open) return;
+    return registerDialogClose(() => onOpenChange?.(false, undefined as never));
+  }, [open, onOpenChange]);
+  return <DialogPrimitive.Root data-slot="dialog" open={open} onOpenChange={onOpenChange} {...props} />
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {

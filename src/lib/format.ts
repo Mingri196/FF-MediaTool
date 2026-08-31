@@ -32,9 +32,9 @@ export function replaceExt(path: string, newExt: string): string {
   return `${base}.${newExt}`;
 }
 
-/** 从文件路径推导输出路径：同目录 原名_out.新扩展 */
+/** 从文件路径推导输出路径：同目录，剥离原后缀后直接拼目标后缀（原名.新扩展） */
 export function deriveOutputPath(input: string, newExt: string): string {
-  return replaceExt(input, `_out.${newExt}`);
+  return replaceExt(input, newExt);
 }
 
 /** 清洗 Windows 长路径前缀 \\?\ */

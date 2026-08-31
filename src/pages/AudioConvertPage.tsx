@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Play, Plus, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,20 +21,41 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useSettings } from "@/settings/SettingsProvider";
 import { useTasks } from "@/tasks/TaskProvider";
 import { api } from "@/lib/tauri";
 import { buildAudioArgs, fmtSec, type AudioSegment } from "@/audio/builder";
-import { AUDIO_BIT_DEPTHS, AUDIO_CODECS, AUDIO_FORMATS, AUDIO_SAMPLE_RATES } from "@/audio/formatPresets";
+import { AUDIO_BIT_DEPTHS, AUDIO_CODECS, AUDIO_FORMATS, AUDIO_SAMPLE_RATES, extOfValue, formatValue } from "@/audio/formatPresets";
 import { defaultAudioParams, type AudioParams } from "@/audio/types";
 import { DropZone } from "@/components/shared/DropZone";
 import { FileRow } from "@/components/shared/FileRow";
+import { CommandPreviewCard } from "@/components/shared/CommandPreviewCard";
+import { useCommandPreview, normalizeUserArgs } from "@/components/shared/useCommandPreview";
 import { basename, deriveOutputPath } from "@/lib/format";
-import type { MediaBasicInfo } from "@/types";
+import { useRegisterPageSnapshot, useTabId, useTabInitialState } from "@/tabs/TabManager";
+import type { EncoderPreset, MediaBasicInfo } from "@/types";
 
 type AudioMode = "convert" | "split" | "concat";
+
+/** 复制标签时复刻的音频转换页状态快照 */
+interface AudioConvertSnapshot {
+  input: string;
+  media: MediaBasicInfo | null;
+  format: string;
+  output: string;
+  audio: AudioParams;
+  mode: AudioMode;
+  presetId: string;
+  extractTrack: boolean;
+  trackIndex: number;
+  clipStart: number;
+  clipEnd: number;
+  splitEvery: number;
+  segments: AudioSegment[];
+}
 
 const CHANNEL_MODES = [
   { value: "none", key: "aef.channel.none" as const },
@@ -47,30 +68,39 @@ const CHANNEL_MODES = [
 /** 音频转换页（PRD 4.1-4.4）：转换/提取/分割/拼接 + 音量声道处理 + 滤镜 */
 export function AudioConvertPage() {
   const { t } = useI18n();
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const { guardAddTask } = useTasks();
+  const tabId = useTabId();
 
-  const [input, setInput] = useState("");
-  const [media, setMedia] = useState<MediaBasicInfo | null>(null);
-  const [format, setFormat] = useState("mp3");
-  const [output, setOutput] = useState("");
-  const [audio, setAudio] = useState<AudioParams>(defaultAudioParams);
-  const [mode, setMode] = useState<AudioMode>("convert");
+  const init = useTabInitialState<AudioConvertSnapshot>();
+  const [input, setInput] = useState(init?.input ?? "");
+  const [media, setMedia] = useState<MediaBasicInfo | null>(init?.media ?? null);
+  const [format, setFormat] = useState(init?.format ?? "mp3");
+  const [output, setOutput] = useState(init?.output ?? "");
+  const [audio, setAudio] = useState<AudioParams>(init?.audio ?? defaultAudioParams);
+  const [mode, setMode] = useState<AudioMode>(init?.mode ?? "convert");
+  const [presetId, setPresetId] = useState(init?.presetId ?? "");
 
   // 转换模式
-  const [extractTrack, setExtractTrack] = useState(false);
-  const [trackIndex, setTrackIndex] = useState(0);
-  const [clipStart, setClipStart] = useState(0);
-  const [clipEnd, setClipEnd] = useState(0);
+  const [extractTrack, setExtractTrack] = useState(init?.extractTrack ?? false);
+  const [trackIndex, setTrackIndex] = useState(init?.trackIndex ?? 0);
+  const [clipStart, setClipStart] = useState(init?.clipStart ?? 0);
+  const [clipEnd, setClipEnd] = useState(init?.clipEnd ?? 0);
 
   // 分割
-  const [splitEvery, setSplitEvery] = useState(60);
+  const [splitEvery, setSplitEvery] = useState(init?.splitEvery ?? 60);
 
   // 拼接
-  const [segments, setSegments] = useState<AudioSegment[]>([
+  const [segments, setSegments] = useState<AudioSegment[]>(init?.segments ?? [
     { startSec: 0, endSec: -1 },
     { startSec: -1, endSec: -1 },
   ]);
+
+  // 复制标签：聚合最新状态供 TabManager 深拷贝注入新标签
+  const snapRef = useRef<AudioConvertSnapshot>({ input, media, format, output, audio, mode, presetId, extractTrack, trackIndex, clipStart, clipEnd, splitEvery, segments });
+  snapRef.current = { input, media, format, output, audio, mode, presetId, extractTrack, trackIndex, clipStart, clipEnd, splitEvery, segments };
+  useRegisterPageSnapshot("audio-convert", () => snapRef.current);
+
   const durationSec = media?.ok ? media.durationMs / 1000 : 0;
 
   const isVideoInput = media?.ok && media.hasVideo;
@@ -94,7 +124,7 @@ export function AudioConvertPage() {
     const cfgDir = settings?.outputPaths?.audioConvert;
     const defaultDir = cfgDir || (await api.getOptDir());
     const baseInput = defaultDir + "/" + basename(picked);
-    setOutput(deriveOutputPath(baseInput, format));
+    setOutput(deriveOutputPath(baseInput, extOfValue(format)));
     try {
       const info = await api.mediaProbeBasic(picked);
       setMedia(info);
@@ -108,17 +138,17 @@ export function AudioConvertPage() {
       setMedia(null);
     }
   }, [t, format]);
-
   /** 智能匹配格式 */
   const applyFormat = useCallback(
-    async (ext: string) => {
-      setFormat(ext);
+    async (value: string) => {
+      setFormat(value);
       if (input) {
         const cfgDir = settings?.outputPaths?.audioConvert || (await api.getOptDir());
         const baseInput = cfgDir + "/" + basename(input);
-        setOutput(deriveOutputPath(baseInput, ext));
+        // 输出扩展名按映射取（wavpack → .wv）
+        setOutput(deriveOutputPath(baseInput, extOfValue(value)));
       }
-      const p = AUDIO_FORMATS.find((f) => f.ext === ext);
+      const p = AUDIO_FORMATS.find((f) => formatValue(f) === value);
       if (!p) return;
       setAudio((a) => ({
         ...a,
@@ -139,6 +169,126 @@ export function AudioConvertPage() {
   // copy 判定：有损滤镜在 copy 下禁用
   const copyAudio = audio.acodec === "copy";
 
+  // ---- 命令预览（自动生成；按模式）----
+  const autoArgs = useMemo<string[] | null>(() => {
+    if (!input || !output) return null;
+    try {
+      if (mode === "split") {
+        // 分割：以首段命令作为代表预览
+        if (durationSec <= 0) return null;
+        const count = Math.max(2, Math.floor(durationSec / Math.max(1, splitEvery)));
+        const segDur = durationSec / count;
+        const firstOut = insertSuffix(output, "_01");
+        return buildAudioArgs({
+          input,
+          output: firstOut,
+          audio,
+          clip: { startSec: 0, endSec: Math.min(segDur, durationSec) },
+        });
+      }
+      if (mode === "concat") {
+        const valid = segments.filter((s) => s.startSec >= 0);
+        if (valid.length < 2) return null;
+        return buildAudioArgs({ input, output, audio, concat: valid.map((s) => ({ ...s })) });
+      }
+      // convert / 提取
+      return buildAudioArgs({
+        input,
+        output,
+        audio,
+        clip:
+          clipStart > 0 || clipEnd > 0
+            ? { startSec: clipStart, endSec: clipEnd > 0 ? clipEnd : -1 }
+            : null,
+        extract: extractTrack && isVideoInput ? { trackIndex } : null,
+      });
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }, [input, output, audio, mode, clipStart, clipEnd, extractTrack, trackIndex, isVideoInput, durationSec, splitEvery, segments]);
+
+  const cmdPreview = useCommandPreview(autoArgs);
+
+  /** 将用户编辑的命令作为模板，替换其中的输入/输出路径后应用到具体任务 */
+  const substituteCmd = (text: string, fromInput: string, fromOutput: string, toInput: string, toOutput: string): string[] => {
+    let t = text;
+    if (fromInput) t = t.split(fromInput).join(toInput);
+    if (fromOutput) t = t.split(fromOutput).join(toOutput);
+    return normalizeUserArgs(t);
+  };
+
+  /** 批量模式（分割/拼接/提取）执行：dirty 时用编辑命令逐项应用 */
+  const enqueueFromPreview = (
+    outs: { out: string; input: string; build: () => string[] }[],
+  ) => {
+    if (cmdPreview.dirty && cmdPreview.text.trim()) {
+      // 用户编辑过：以编辑命令为模板，替换各任务的输入/输出路径
+      const fromInput = input;
+      for (const o of outs) {
+        const fromOutput = autoArgs?.[autoArgs.length - 1] ?? "";
+        const args = substituteCmd(cmdPreview.text, fromInput, fromOutput, o.input, o.out);
+        void guardAddTask({
+          name: `${basename(o.input)} → ${basename(o.out)}`,
+          args,
+          inputPath: o.input,
+          outputPath: o.out,
+        }, tabId);
+      }
+      return;
+    }
+    for (const o of outs) {
+      void guardAddTask({
+        name: `${basename(o.input)} → ${basename(o.out)}`,
+        args: o.build(),
+        inputPath: o.input,
+        outputPath: o.out,
+      }, tabId);
+    }
+  };
+
+  // ---- 预设 ----
+  const audioPresets = useMemo(
+    () => (settings?.presets ?? []).filter((p) => p.category === "audio"),
+    [settings?.presets],
+  );
+
+  /** 应用音频预设：回填全部音频参数与页面模式；空 id =（默认参数）重置 */
+  const applyPreset = (id: string) => {
+    setPresetId(id);
+    const p = audioPresets.find((x) => x.id === id);
+    if (!p) {
+      // （默认参数）：恢复出厂默认
+      setAudio(defaultAudioParams());
+      setMode("convert");
+      return;
+    }
+    const saved = p.params as Partial<AudioParams>;
+    setAudio({ ...defaultAudioParams(), ...saved } as AudioParams);
+    // 预设参数里可携带模式（分割/拼接/转换），一并回填
+    const savedMode = (p.params as { mode?: AudioMode }).mode;
+    if (savedMode === "split" || savedMode === "concat" || savedMode === "convert") {
+      setMode(savedMode);
+    }
+  };
+
+  /** 保存当前音频参数为预设（标记 category=audio） */
+  const savePreset = () => {
+    const name = window.prompt(t("audio.savePresetName"), "My Preset");
+    if (!name?.trim()) return;
+    const now = Date.now();
+    const preset: EncoderPreset = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      category: "audio",
+      createdAt: now,
+      updatedAt: now,
+      params: { ...audio, mode } as unknown as Record<string, unknown>,
+    };
+    update({ presets: [...(settings?.presets ?? []), preset] });
+    toast.success(t("audio.presetSaved"));
+  };
+
   const enqueueOne = (out: string, params: AudioParams, extra?: { clip?: AudioSegment | null; concat?: AudioSegment[] | null; track?: number }) => {
     const args = buildAudioArgs({
       input,
@@ -153,12 +303,22 @@ export function AudioConvertPage() {
       args,
       inputPath: input,
       outputPath: out,
-    });
+    }, tabId);
   };
 
   /** 转换 / 提取 */
   const startConvert = () => {
     if (!input || !output) return;
+    // 用户编辑过 → 直接用编辑后的命令
+    if (cmdPreview.dirty && cmdPreview.text.trim()) {
+      void guardAddTask({
+        name: `${basename(input)} → ${basename(output)}`,
+        args: cmdPreview.getArgs(),
+        inputPath: input,
+        outputPath: output,
+      }, tabId);
+      return;
+    }
     enqueueOne(output, audio, {
       clip:
         clipStart > 0 || clipEnd > 0
@@ -173,25 +333,24 @@ export function AudioConvertPage() {
     if (!input || durationSec <= 0) return;
     const count = Math.max(2, Math.floor(durationSec / Math.max(1, splitEvery)));
     const segDur = durationSec / count;
-    const outs: string[] = [];
     const params = audio;
-    for (let i = 0; i < count; i++) {
+    const outs = Array.from({ length: count }, (_, i) => {
       const start = i * segDur;
       const end = i === count - 1 ? durationSec : (i + 1) * segDur;
       const out = insertSuffix(output, `_${String(i + 1).padStart(2, "0")}`);
-      outs.push(out);
-      void guardAddTask({
-        name: `${basename(input)} → ${basename(out)}`,
-        args: buildAudioArgs({
-          input,
-          output: out,
-          audio: params,
-          clip: { startSec: start, endSec: end },
-        }),
-        inputPath: input,
-        outputPath: out,
-      });
-    }
+      return {
+        out,
+        input,
+        build: () =>
+          buildAudioArgs({
+            input,
+            output: out,
+            audio: params,
+            clip: { startSec: start, endSec: end },
+          }),
+      };
+    });
+    enqueueFromPreview(outs);
   };
 
   /** 拼接 */
@@ -199,6 +358,16 @@ export function AudioConvertPage() {
     if (!input || segments.length < 2) return;
     const valid = segments.filter((s) => s.startSec >= 0);
     if (valid.length < 2) return;
+    // 用户编辑过 → 直接用编辑后的命令
+    if (cmdPreview.dirty && cmdPreview.text.trim()) {
+      void guardAddTask({
+        name: `${basename(input)} → ${basename(output)}`,
+        args: cmdPreview.getArgs(),
+        inputPath: input,
+        outputPath: output,
+      }, tabId);
+      return;
+    }
     enqueueOne(output, audio, { concat: valid.map((s) => ({ ...s })) });
   };
 
@@ -217,9 +386,33 @@ export function AudioConvertPage() {
     <DropZone onFiles={([path]) => path && void pickInput(path)} accept="audio" className="h-full">
       <div className="h-full overflow-y-auto">
         <div className="mx-auto max-w-5xl space-y-5 p-6">
-        <div>
-          <h1 className="text-xl font-semibold">{t("audio.title")}</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">{t("audio.desc")}</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold">{t("audio.title")}</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t("audio.desc")}</p>
+          </div>
+          {/* 预设快速调用（与视频转换页一致） */}
+          <div className="flex items-center gap-2">
+            <Select value={presetId} onValueChange={(v) => v !== null && applyPreset(v)}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder={t("audio.presetNone")}>
+                  {(val) => {
+                    const p = audioPresets.find((x) => x.id === val);
+                    return p ? p.name : t("audio.presetNone");
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">{t("audio.presetNone")}</SelectItem>
+                {audioPresets.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={savePreset} title={t("audio.savePreset")}>
+              <Save className="size-4" />
+            </Button>
+          </div>
         </div>
 
         {/* 输入 / 格式 / 输出 */}
@@ -241,10 +434,17 @@ export function AudioConvertPage() {
               <div className="space-y-1.5">
                 <Label>{t("audio.format")}</Label>
                 <Select value={format} onValueChange={(v) => v !== null && applyFormat(v)}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {(val: string) => {
+                        const f = AUDIO_FORMATS.find((x) => formatValue(x) === val);
+                        return f ? t(f.label) : "";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {AUDIO_FORMATS.map((f) => (
-                      <SelectItem key={f.ext} value={f.ext}>{t(f.label)}</SelectItem>
+                      <SelectItem key={f.ext} value={formatValue(f)}>{t(f.label)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -600,27 +800,33 @@ export function AudioConvertPage() {
           </CardContent>
         </Card>
 
-        {/* 操作 */}
-        <div className="flex items-center gap-2 pb-4">
-          {mode === "convert" && (
-            <Button onClick={startConvert} disabled={!input || !output}>
-              <Play className="size-4" />
-              {t("audio.start")}
-            </Button>
-          )}
-          {mode === "split" && (
-            <Button onClick={startSplit} disabled={!input || durationSec <= 0}>
-              <Play className="size-4" />
-              {t("audio.splitAdd")}
-            </Button>
-          )}
-          {mode === "concat" && (
-            <Button onClick={startConcat} disabled={!input || segments.filter((s) => s.startSec >= 0).length < 2}>
-              <Play className="size-4" />
-              {t("audio.start")}
-            </Button>
-          )}
-        </div>
+        {/* 命令预览 + 操作（可编辑 textarea） */}
+        <CommandPreviewCard
+          value={cmdPreview.text}
+          onEdit={cmdPreview.setText}
+          startLabelKey="audio.start"
+          onStart={() => {
+            if (mode === "split") startSplit();
+            else if (mode === "concat") startConcat();
+            else startConvert();
+          }}
+          startDisabled={
+            !input ||
+            (mode === "convert" && !output) ||
+            (mode === "split" && durationSec <= 0) ||
+            (mode === "concat" && segments.filter((s) => s.startSec >= 0).length < 2)
+          }
+          onCopy={() => {
+            void navigator.clipboard.writeText(cmdPreview.text);
+            toast.success(t("common.done"));
+          }}
+          copyDisabled={!autoArgs}
+          overwriteOpen={cmdPreview.overwriteOpen}
+          overwriteText={cmdPreview.pendingText}
+          onConfirmOverwrite={cmdPreview.confirmOverwrite}
+          onCancelOverwrite={cmdPreview.cancelOverwrite}
+          empty={!autoArgs}
+        />
       </div>
       </div>
     </DropZone>

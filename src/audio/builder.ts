@@ -41,8 +41,13 @@ export function encodeArgs(a: AudioParams, out: string[]): void {
       }
       break;
     case "vbr":
-      // libmp3lame/libvorbis/opus 用 -q:a；aac 用 -q:a 也可（caa 的 vbr）
-      if (a.acodec !== "flac" && a.acodec !== "wavpack" && a.acodec !== "pcm_s16le" && a.acodec !== "pcm_s24le") {
+      // libmp3lame/libvorbis 用 -q:a；libopus 不支持质量模式，改用码率
+      if (a.acodec === "libopus") {
+        // opus vbr 质量语义：默认 128k 起，随 vbrQuality 0-10 映射 64k~256k
+        const kbps = a.bitrateK > 0 ? a.bitrateK : Math.round(64 + (a.vbrQuality / 10) * 192);
+        out.push("-b:a", `${kbps}k`);
+        out.push("-vbr", "on");
+      } else if (a.acodec !== "flac" && a.acodec !== "wavpack" && a.acodec !== "pcm_s16le" && a.acodec !== "pcm_s24le") {
         out.push("-q:a", String(a.vbrQuality));
       }
       break;
@@ -106,6 +111,19 @@ export function buildAudioFilterChain(a: AudioParams): string | null {
   return parts.length ? parts.join(",") : null;
 }
 
+/**
+ * wavpack 兼容处理：ffmpeg 9.x 的 wavpack 编码器对 mp3(fltp) 等浮点输入
+ * 存在 block size 计算 bug（invalid block size: 47 → 0 字节文件）。
+ * 附加 asetnsamples 强制重采样对齐，规避该 bug（无损，时长保持不变）。
+ */
+export function wavpackCompatFilter(a: AudioParams, base: string | null): string | null {
+  if (a.acodec !== "wavpack" || isCopy(a)) return base;
+  const parts: string[] = [];
+  if (base) parts.push(base);
+  parts.push("asetnsamples=n=1024:pad=1");
+  return parts.join(",");
+}
+
 /** 多段拼接（≤8 段，filter_complex concat） */
 function concatArgs(
   input: string,
@@ -131,6 +149,8 @@ function concatArgs(
     "-map", "[aout]",
   );
   encodeArgs(a, out);
+  const fc = wavpackCompatFilter(a, null);
+  if (fc) out.push("-af", fc);
   out.push(output);
   return out;
 }
@@ -159,7 +179,8 @@ export function buildAudioArgs(input: BuildAudioArgsInput): string[] {
   encodeArgs(audio, out);
 
   const filterChain = buildAudioFilterChain(audio);
-  if (filterChain) out.push("-af", filterChain);
+  const compat = wavpackCompatFilter(audio, filterChain);
+  if (compat) out.push("-af", compat);
 
   out.push(output);
   return out;

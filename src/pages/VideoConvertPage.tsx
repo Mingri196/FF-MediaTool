@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Play, Save, Copy } from "lucide-react";
+import { Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,14 +26,28 @@ import { useTasks } from "@/tasks/TaskProvider";
 import { api } from "@/lib/tauri";
 import { buildVideoArgs } from "@/video/builder";
 import { VIDEO_FORMATS } from "@/video/formatPresets";
-import { defaultVideoAudioParams, defaultVideoParams, type VideoParams } from "@/video/types";
+import { defaultVideoAudioParams, defaultVideoParams, type VideoAudioParams, type VideoParams } from "@/video/types";
 import { FilterSection } from "@/components/video/FilterSection";
 import { VideoEncodeSection } from "@/components/video/VideoEncodeSection";
 import { DropZone } from "@/components/shared/DropZone";
 import { FileRow } from "@/components/shared/FileRow";
+import { CommandPreviewCard } from "@/components/shared/CommandPreviewCard";
+import { useCommandPreview } from "@/components/shared/useCommandPreview";
 import { Input } from "@/components/ui/input";
 import { basename, deriveOutputPath, formatMs } from "@/lib/format";
+import { useRegisterPageSnapshot, useTabId, useTabInitialState } from "@/tabs/TabManager";
 import type { EncoderPreset, MediaBasicInfo } from "@/types";
+
+/** 复制标签时复刻的视频转换页状态快照 */
+interface VideoConvertSnapshot {
+  input: string;
+  media: MediaBasicInfo | null;
+  format: string;
+  output: string;
+  video: VideoParams;
+  audio: VideoAudioParams;
+  presetId: string;
+}
 
 /**
  * 视频转换页（PRD 3.1 / 3.3 / 3.4）：
@@ -45,16 +59,34 @@ export function VideoConvertPage() {
   const { t } = useI18n();
   const { settings, update } = useSettings();
   const { guardAddTask } = useTasks();
+  const tabId = useTabId();
 
-  const [input, setInput] = useState("");
-  const [media, setMedia] = useState<MediaBasicInfo | null>(null);
+  const init = useTabInitialState<VideoConvertSnapshot>();
+  const [input, setInput] = useState(init?.input ?? "");
+  const [media, setMedia] = useState<MediaBasicInfo | null>(init?.media ?? null);
   const [probing, setProbing] = useState(false);
-  const [format, setFormat] = useState("mp4");
-  const [output, setOutput] = useState("");
-  const [video, setVideo] = useState<VideoParams>(defaultVideoParams);
-  const [audio, setAudio] = useState(defaultVideoAudioParams);
-  const [presetId, setPresetId] = useState("");
-  const [preview, setPreview] = useState<string[] | null>(null);
+  const [format, setFormat] = useState(init?.format ?? "mp4");
+  const [output, setOutput] = useState(init?.output ?? "");
+  const [video, setVideo] = useState<VideoParams>(init?.video ?? defaultVideoParams());
+  const [audio, setAudio] = useState(init?.audio ?? defaultVideoAudioParams());
+  const [presetId, setPresetId] = useState(init?.presetId ?? "");
+
+  // 复制标签：聚合最新状态供 TabManager 深拷贝注入新标签
+  const snapRef = useRef<VideoConvertSnapshot>({ input, media, format, output, video, audio, presetId });
+  snapRef.current = { input, media, format, output, video, audio, presetId };
+  useRegisterPageSnapshot("video-convert", () => snapRef.current);
+
+  // ---- 命令预览（自动生成；可手动编辑）----
+  const autoArgs = useMemo<string[] | null>(() => {
+    if (!input || !output) return null;
+    try {
+      return buildVideoArgs({ input, output, video, audio });
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }, [input, output, video, audio]);
+  const preview = useCommandPreview(autoArgs);
 
   const lastOutputDir = settings?.lastOutputDir ?? null;
 
@@ -143,21 +175,6 @@ export function VideoConvertPage() {
     }
   }, [output]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- 命令预览（实时） ----
-  useEffect(() => {
-    if (!input || !output) {
-      setPreview(null);
-      return;
-    }
-    try {
-      const args = buildVideoArgs({ input, output, video, audio });
-      setPreview(args);
-    } catch (e) {
-      console.error(e);
-      setPreview(null);
-    }
-  }, [input, output, video, audio]);
-
   const copyDisabled = video.vcodec === "copy";
 
   // ---- 预设 ----
@@ -170,12 +187,18 @@ export function VideoConvertPage() {
     (id: string) => {
       setPresetId(id);
       const p = videoPresets.find((x) => x.id === id);
-      if (!p) return;
+      if (!p) {
+        // （默认参数）：恢复出厂默认
+        setVideo(defaultVideoParams());
+        setAudio(defaultVideoAudioParams());
+        return;
+      }
       const params = p.params as Partial<VideoParams> | undefined;
       if (params) {
         setVideo({ ...defaultVideoParams(), ...params });
         if (params.vcodec === "copy") {
           // copy 预设：音频保持默认
+          setAudio(defaultVideoAudioParams());
         }
       }
     },
@@ -201,18 +224,24 @@ export function VideoConvertPage() {
   // ---- 开始 ----
   const start = () => {
     if (!input || !output) return;
-    const args = buildVideoArgs({ input, output, video, audio });
+    // 优先执行用户手动编辑后的命令（hook 内部处理 dirty）
+    const args = preview.getArgs();
     void guardAddTask({
       name: `${basename(input)} → ${basename(output)}`,
       args,
       inputPath: input,
       outputPath: output,
-    });
+    }, tabId);
     update({ lastOutputDir: output.replace(/[\\/][^\\/]+$/, "") });
     // 记录最近预设
     if (presetId && settings) {
       update({ recentPresets: [presetId, ...settings.recentPresets.filter((x) => x !== presetId)].slice(0, 5) });
     }
+  };
+
+  const copyCmd = () => {
+    void navigator.clipboard.writeText(preview.text);
+    toast.success(t("common.done"));
   };
 
   return (
@@ -228,7 +257,12 @@ export function VideoConvertPage() {
             <div className="flex items-center gap-2">
               <Select value={presetId} onValueChange={(v) => v !== null && applyPreset(v)}>
                 <SelectTrigger className="w-56">
-                  <SelectValue />
+                  <SelectValue placeholder={t("video.presetNone")}>
+                    {(val) => {
+                      const p = videoPresets.find((x) => x.id === val);
+                      return p ? p.name : t("video.presetNone");
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">{t("video.presetNone")}</SelectItem>
@@ -335,44 +369,21 @@ export function VideoConvertPage() {
           </CardContent>
         </Card>
 
-        {/* 命令预览 + 操作 */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t("video.preview")}</CardTitle>
-            <CardDescription>{t("video.previewHint")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {preview ? (
-              <div className="max-h-40 overflow-y-auto rounded-md bg-muted/60 p-3 font-mono text-xs leading-5">
-                {preview.map((a, i) => (
-                  <span key={i} className="whitespace-pre-wrap break-all">
-                    {a}
-                    {i < preview.length - 1 ? " " : ""}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">{t("video.previewHint")}</p>
-            )}
-            <div className="flex items-center gap-2">
-              <Button onClick={start} disabled={!input || !output}>
-                <Play className="size-4" />
-                {t("video.start")}
-              </Button>
-              <Button
-                variant="outline"
-                disabled={!preview}
-                onClick={() => {
-                  void navigator.clipboard.writeText(preview!.join(" "));
-                  toast.success(t("common.done"));
-                }}
-              >
-                <Copy className="size-4" />
-                {t("video.copyCmd")}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* 命令预览 + 操作（可编辑 textarea） */}
+        <CommandPreviewCard
+          value={preview.text}
+          onEdit={preview.setText}
+          startLabelKey="video.start"
+          onStart={start}
+          startDisabled={!input || !output}
+          onCopy={copyCmd}
+          copyDisabled={!autoArgs}
+          overwriteOpen={preview.overwriteOpen}
+          overwriteText={preview.pendingText}
+          onConfirmOverwrite={preview.confirmOverwrite}
+          onCancelOverwrite={preview.cancelOverwrite}
+          empty={!autoArgs}
+        />
       </div>
       </div>
     </DropZone>

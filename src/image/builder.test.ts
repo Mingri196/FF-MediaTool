@@ -46,10 +46,23 @@ describe("buildImageArgs", () => {
   });
 
   it("AVIF 参数", () => {
-    const args = build({ format: "avif", avifSpeed: 4, avifDepth: 10 });
-    expect(args).toContain("libsvtav1");
+    const args = build({ format: "avif", quality: 75, avifSpeed: 4, avifDepth: 10 });
+    // libaom-av1（essentials 版无 libsvtav1）
+    expect(args).toContain("libaom-av1");
+    expect(args).toContain("-crf");
+    expect(args).not.toContain("libsvtav1");
     expect(args).toContain("-cpu-used");
     expect(args).toContain("4");
+    expect(args).toContain("-pix_fmt");
+    expect(args).toContain("yuv420p10le");
+  });
+
+  it("AVIF 无损模式用 -crf 0（libaom-av1 忽略 -lossless）", () => {
+    const args = build({ format: "avif", lossless: true });
+    expect(args).toContain("libaom-av1");
+    expect(args).toContain("-crf");
+    expect(args).toContain("0");
+    expect(args).not.toContain("-lossless");
   });
 
   it("等比缩放 50%", () => {

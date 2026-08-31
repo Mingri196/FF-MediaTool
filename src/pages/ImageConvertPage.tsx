@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ImagePlus, FolderOpen, Trash2, Play, RotateCw, FlipHorizontal, FlipVertical, Crop, Palette, Expand } from "lucide-react";
+import { ImagePlus, FolderOpen, Save, Trash2, RotateCw, FlipHorizontal, FlipVertical, Crop, Palette, Expand } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,18 +8,31 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropZone } from "@/components/shared/DropZone";
+import { CommandPreviewCard } from "@/components/shared/CommandPreviewCard";
+import { useCommandPreview, normalizeUserArgs } from "@/components/shared/useCommandPreview";
 import { useI18n } from "@/i18n";
 import { useTasks } from "@/tasks/TaskProvider";
 import { useSettings } from "@/settings/SettingsProvider";
-import { api } from "@/lib/tauri";
-import { buildImageArgs, genOutputPath } from "@/image/builder";
-import { defaultImageParams, IMAGE_OUTPUT_FORMATS, type ImageFileItem, type ImageParams } from "@/image/types";
+import { api, invoke } from "@/lib/tauri";
+import { buildImageArgs, genOutputPath, buildGifSplitArgs, buildGifCombineArgs, buildConcatListContent, sortByTrailingNumber } from "@/image/builder";
+import { defaultImageParams, IMAGE_OUTPUT_FORMATS, type ImageFileItem, type ImageParams, type GifMode } from "@/image/types";
 import { INPUT_IMAGE_EXTS, getPreset, applyFormatDefaults } from "@/image/formatPresets";
 import { basename } from "@/lib/format";
-import { invoke } from "@/lib/tauri";
+import { useRegisterPageSnapshot, useTabId, useTabInitialState } from "@/tabs/TabManager";
+import type { EncoderPreset } from "@/types";
+
+/** 复制标签时复刻的图片转换页状态快照（selected 转数组便于序列化） */
+interface ImageConvertSnapshot {
+  files: ImageFileItem[];
+  selected: number[];
+  params: ImageParams;
+  presetId: string;
+  gifMode: GifMode;
+}
 
 const RESIZE_MODES = ["none", "percent", "fitWidth", "fitHeight", "fixed", "custom", "fill", "contain", "cover"] as const;
 const ADAPT_MODES = ["none", "fill", "contain", "cover"] as const;
@@ -43,11 +56,22 @@ const RESIZE_TOOLTIPS: Record<string, string> = {
 export function ImageConvertPage() {
   const { t } = useI18n();
   const { guardAddTask } = useTasks();
-  const { settings } = useSettings();
-  const [files, setFiles] = useState<ImageFileItem[]>([]);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [params, setParams] = useState<ImageParams>(defaultImageParams());
+  const { settings, update } = useSettings();
+  const tabId = useTabId();
+
+  const init = useTabInitialState<ImageConvertSnapshot>();
+  const [files, setFiles] = useState<ImageFileItem[]>(init?.files ?? []);
+  const [selected, setSelected] = useState<Set<number>>(init?.selected ? new Set(init.selected) : new Set());
+  const [params, setParams] = useState<ImageParams>(init?.params ?? defaultImageParams());
   const [processing, setProcessing] = useState(false);
+  const [presetId, setPresetId] = useState(init?.presetId ?? "");
+  // GIF 输出模式：none=普通转换 / split=拆分 / combine=合成（两者互斥，可同时关闭）
+  const [gifMode, setGifMode] = useState<GifMode>(init?.gifMode ?? "none");
+
+  // 复制标签：聚合最新状态供 TabManager 深拷贝注入新标签
+  const snapRef = useRef<ImageConvertSnapshot>({ files, selected: [...selected], params, presetId, gifMode });
+  snapRef.current = { files, selected: [...selected], params, presetId, gifMode };
+  useRegisterPageSnapshot("image-convert", () => snapRef.current);
 
   const allSelected = files.length > 0 && selected.size === files.length;
   const selectedCount = selected.size;
@@ -146,30 +170,178 @@ export function ImageConvertPage() {
   const formatPreset = useMemo(() => getPreset(params.format), [params.format]);
   const isLossless = params.lossless;
 
+  // ---- GIF 拆分/合成模式派生状态（仅 format=gif 时参与）----
+  const isSplitMode = gifMode === "split";
+  const isCombineMode = gifMode === "combine";
+  /** 拆分模式：当前选中文件中 GIF 文件（按文件列表顺序） */
+  const splitGifFiles = useMemo(
+    () => files.filter((f, i) => selected.has(i) && f.ext.toLowerCase() === "gif"),
+    [files, selected],
+  );
+  /** 合成模式：按序号升序排序后的选中图片（静态图片序列；GIF 不作为合成输入） */
+  const combineImages = useMemo(() => {
+    const sel = files.filter((f, i) => selected.has(i) && f.ext.toLowerCase() !== "gif");
+    return sortByTrailingNumber(sel);
+  }, [files, selected]);
+
   const changeFormat = (fmt: string) => {
     setParams(applyFormatDefaults(params, fmt as ImageParams["format"]));
+    // 切换输出格式离开 gif 时：自动取消拆分/合成模式，恢复默认关闭
+    if (fmt !== "gif") setGifMode("none");
   };
 
-  const startBatch = () => {
+  // ---- 命令预览（自动生成；以第一个选中文件为代表）----
+  const firstSelectedPath = useMemo(() => {
+    const idx = [...selected][0];
+    return idx !== undefined ? files[idx]?.path ?? "" : "";
+  }, [files, selected]);
+  const autoArgs = useMemo<string[] | null>(() => {
+    if (isSplitMode) {
+      // 拆分：以第一个 GIF 为代表，预览拆帧命令（输出序列模式）
+      const gif = splitGifFiles[0];
+      if (!gif) return null;
+      const { args } = buildGifSplitArgs(gif.path, params.outputDir);
+      return args;
+    }
+    if (isCombineMode) {
+      // 合成：以列表文件为输入预览（占位路径，实际运行时写入）
+      if (combineImages.length < 2) return null;
+      const out = genOutputPath(combineImages[0].path, "gif", 0, params.namingPrefix, params.namingSuffix, params.namingSeq, params.outputDir);
+      return buildGifCombineArgs(
+        `${params.outputDir || ""}/_combine_preview.txt`,
+        out,
+        params.gifLoop,
+        params.gifColors,
+      );
+    }
+    if (!firstSelectedPath) return null;
+    try {
+      const out = genOutputPath(firstSelectedPath, params.format, 0, params.namingPrefix, params.namingSuffix, params.namingSeq, params.outputDir);
+      return buildImageArgs(params, firstSelectedPath, out);
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  }, [firstSelectedPath, params, selected, isSplitMode, isCombineMode, splitGifFiles, combineImages]);
+
+  const cmdPreview = useCommandPreview(autoArgs);
+
+  /** 将用户编辑的命令作为模板，替换输入/输出路径后应用到各文件 */
+  const substituteCmd = (text: string, fromInput: string, fromOutput: string, toInput: string, toOutput: string): string[] => {
+    let t = text;
+    if (fromInput) t = t.split(fromInput).join(toInput);
+    if (fromOutput) t = t.split(fromOutput).join(toOutput);
+    return normalizeUserArgs(t);
+  };
+
+  const startBatch = async () => {
     if (selectedCount === 0) return;
     setProcessing(true);
+    // 拆分模式：每个 GIF 生成一个任务，拆为 PNG 序列
+    if (isSplitMode) {
+      for (const gif of splitGifFiles) {
+        const { args, outputPattern } = buildGifSplitArgs(gif.path, params.outputDir);
+        guardAddTask({
+          name: `${basename(gif.path)} → PNG 序列`,
+          args,
+          inputPath: gif.path,
+          outputPath: outputPattern,
+        }, tabId);
+      }
+      setProcessing(false);
+      toast.success(t("img.gifSplitDone", { n: splitGifFiles.length }));
+      return;
+    }
+    // 合成模式：所有选中序号图片按序合成为单个 GIF
+    if (isCombineMode) {
+      if (combineImages.length < 2) {
+        toast.error(t("img.gifCombineNoInput"));
+        setProcessing(false);
+        return;
+      }
+      try {
+        const first = combineImages[0];
+        const out = genOutputPath(first.path, "gif", 0, params.namingPrefix, params.namingSuffix, params.namingSeq, params.outputDir);
+        // 写入临时 concat 列表文件（合成完成后保留在输出目录，见 buildConcatListContent）
+        const listPath = `${params.outputDir || ""}/_combine_${Date.now()}.txt`;
+        await api.writeTextFile(listPath, buildConcatListContent(combineImages.map((x) => x.path), params.gifFps));
+        const args = buildGifCombineArgs(listPath, out, params.gifLoop, params.gifColors);
+        guardAddTask({
+          name: `${basename(first.path)} → GIF 合成`,
+          args,
+          inputPath: first.path,
+          outputPath: out,
+        }, tabId);
+        setProcessing(false);
+        toast.success(t("img.gifCombineDone", { n: combineImages.length }));
+      } catch (e) {
+        console.error(e);
+        setProcessing(false);
+        toast.error(t("img.gifCombineNoInput"));
+      }
+      return;
+    }
+    // 普通模式：批量转换（原有逻辑不变）
     const selectedFiles = files.filter((_, i) => selected.has(i));
+    // 用户编辑过 → 以编辑命令为模板，替换各文件输入/输出路径
+    const edited = cmdPreview.dirty && cmdPreview.text.trim();
+    const fromInput = firstSelectedPath;
+    const fromOutput = autoArgs?.[autoArgs.length - 1] ?? "";
     for (let i = 0; i < selectedFiles.length; i++) {
       const f = selectedFiles[i];
       const out = genOutputPath(f.path, params.format, i, params.namingPrefix, params.namingSuffix, params.namingSeq, params.outputDir);
-      const args = buildImageArgs(params, f.path, out);
+      const args = edited
+        ? substituteCmd(cmdPreview.text, fromInput, fromOutput, f.path, out)
+        : buildImageArgs(params, f.path, out);
       guardAddTask({
         name: `${basename(f.path)} → ${basename(out)}`,
         args,
         inputPath: f.path,
         outputPath: out,
-      });
+      }, tabId);
     }
     setProcessing(false);
   };
 
   const sliderVal = (v: number | readonly number[]) => (Array.isArray(v) ? v[0] ?? 0 : v);
   const disabled = isLossless;
+
+  // ---- 预设 ----
+  const imagePresets = useMemo(
+    () => (settings?.presets ?? []).filter((p) => p.category === "image"),
+    [settings?.presets],
+  );
+
+  /** 应用图片预设：回填全部图片参数（outputDir 属路径配置，不入预设）；空 id =（默认参数）重置 */
+  const applyPreset = (id: string) => {
+    setPresetId(id);
+    const p = imagePresets.find((x) => x.id === id);
+    if (!p) {
+      // （默认参数）：恢复出厂默认，保留当前输出目录
+      setParams((prev) => ({ ...defaultImageParams(), outputDir: prev.outputDir }));
+      return;
+    }
+    const saved = p.params as Partial<ImageParams>;
+    setParams((prev) => ({ ...defaultImageParams(), ...saved, outputDir: prev.outputDir }));
+  };
+
+  /** 保存当前图片参数为预设（标记 category=image，outputDir 不入预设） */
+  const savePreset = () => {
+    const name = window.prompt(t("img.savePresetName"), "My Preset");
+    if (!name?.trim()) return;
+    const now = Date.now();
+    const { outputDir: _outputDir, ...paramRest } = params;
+    const preset: EncoderPreset = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      category: "image",
+      createdAt: now,
+      updatedAt: now,
+      params: paramRest as unknown as Record<string, unknown>,
+    };
+    update({ presets: [...(settings?.presets ?? []), preset] });
+    toast.success(t("img.presetSaved"));
+  };
 
   const T = (tipKey: string, children: React.ReactNode) => (
     <TooltipProvider delay={300}>
@@ -184,9 +356,33 @@ export function ImageConvertPage() {
     <DropZone onFiles={(paths) => void addFiles(paths)} accept="all" className="h-full">
       <div className="h-full overflow-y-auto">
         <div className="mx-auto max-w-5xl space-y-5 p-6">
-          <div>
-            <h1 className="text-xl font-semibold">{t("img.title")}</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">{t("img.desc")}</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold">{t("img.title")}</h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">{t("img.desc")}</p>
+            </div>
+            {/* 预设快速调用（与视频转换页一致） */}
+            <div className="flex items-center gap-2">
+              <Select value={presetId} onValueChange={(v) => v !== null && applyPreset(v)}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder={t("img.presetNone")}>
+                    {(val) => {
+                      const p = imagePresets.find((x) => x.id === val);
+                      return p ? p.name : t("img.presetNone");
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{t("img.presetNone")}</SelectItem>
+                  {imagePresets.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" onClick={savePreset} title={t("img.savePreset")}>
+                <Save className="size-4" />
+              </Button>
+            </div>
           </div>
 
           {/* 文件列表（含勾选） */}
@@ -195,7 +391,9 @@ export function ImageConvertPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
-                  <CardTitle className="text-base">{t("img.fileList")}</CardTitle>
+                  <CardTitle className="text-base">
+                    {isSplitMode ? t("img.fileListSplit") : isCombineMode ? t("img.fileListCombine") : t("img.fileList")}
+                  </CardTitle>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
@@ -259,10 +457,33 @@ export function ImageConvertPage() {
                 {params.format === "avif" && <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5"><Label>{t("img.avifSpeed")}: {params.avifSpeed}</Label><Slider min={0} max={8} step={1} value={[params.avifSpeed]} onValueChange={(v) => setParams({ ...params, avifSpeed: Math.round(sliderVal(v)) })} /></div>
                     <Select value={String(params.avifDepth)} onValueChange={(v) => v !== null && setParams({ ...params, avifDepth: Number(v) as 8 | 10 | 12 })}><SelectTrigger className="w-32"><Label>{t("img.avifDepth")}</Label><SelectValue /></SelectTrigger><SelectContent><SelectItem value="8">8-bit</SelectItem><SelectItem value="10">10-bit</SelectItem></SelectContent></Select></div>}
-                {params.format === "gif" && <div className="grid grid-cols-3 gap-4">
+                {params.format === "gif" && (
+                  <div className="space-y-3">
+                    {/* 拆分 / 合成模式（互斥；可同时关闭） */}
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="gif-split"
+                        checked={isSplitMode}
+                        onCheckedChange={(v) => setGifMode(v === true ? "split" : "none")}
+                      />
+                      <Label htmlFor="gif-split">{t("img.gifSplitMode")}</Label>
+                      <Checkbox
+                        id="gif-combine"
+                        checked={isCombineMode}
+                        onCheckedChange={(v) => setGifMode(v === true ? "combine" : "none")}
+                      />
+                      <Label htmlFor="gif-combine">{t("img.gifCombineMode")}</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {isSplitMode ? t("img.gifSplitHint") : isCombineMode ? t("img.gifCombineHint") : ""}
+                    </p>
+                    <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-1.5"><Label>{t("img.gifFps")}: {params.gifFps}</Label><Slider min={1} max={60} step={1} value={[params.gifFps]} onValueChange={(v) => setParams({ ...params, gifFps: Math.round(sliderVal(v)) })} /></div>
                     <div className="space-y-1.5"><Label>{t("img.gifLoop")}: {params.gifLoop}</Label><Slider min={0} max={100} step={1} value={[params.gifLoop]} onValueChange={(v) => setParams({ ...params, gifLoop: Math.round(sliderVal(v)) })} /></div>
-                    <div className="space-y-1.5"><Label>{t("img.gifColors")}: {params.gifColors}</Label><Slider min={2} max={256} step={1} value={[params.gifColors]} onValueChange={(v) => setParams({ ...params, gifColors: Math.round(sliderVal(v)) })} /></div></div>}
+                    <div className="space-y-1.5"><Label>{t("img.gifColors")}: {params.gifColors}</Label><Slider min={2} max={256} step={1} value={[params.gifColors]} onValueChange={(v) => setParams({ ...params, gifColors: Math.round(sliderVal(v)) })} /></div>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -392,19 +613,37 @@ export function ImageConvertPage() {
             </CardContent>
           </Card>
 
-          {/* 开始 */}
-          <TooltipProvider delay={300}>
-            <Tooltip open={selectedCount === 0 ? undefined : false}>
-              <TooltipTrigger>
-                <span tabIndex={0}>
-                  <Button size="lg" className="w-full" onClick={startBatch} disabled={selectedCount === 0 || processing}>
-                    <Play className="size-4" />{processing ? t("img.processing") : t("img.startBatch")}
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {selectedCount === 0 && <TooltipContent side="top">{t("img.noSelection")}</TooltipContent>}
-            </Tooltip>
-          </TooltipProvider>
+          {/* 命令预览 + 开始（可编辑 textarea） */}
+          <CommandPreviewCard
+            value={cmdPreview.text}
+            onEdit={cmdPreview.setText}
+            startLabelKey={isSplitMode ? "img.gifSplitStart" : isCombineMode ? "img.gifCombineStart" : "img.startBatch"}
+            onStart={startBatch}
+            startDisabled={
+              isSplitMode
+                ? splitGifFiles.length === 0 || processing
+                : isCombineMode
+                  ? combineImages.length < 2 || processing
+                  : selectedCount === 0 || processing
+            }
+            onCopy={() => {
+              void navigator.clipboard.writeText(cmdPreview.text);
+              void import("sonner").then(({ toast }) => toast.success(t("common.done")));
+            }}
+            copyDisabled={!autoArgs}
+            overwriteOpen={cmdPreview.overwriteOpen}
+            overwriteText={cmdPreview.pendingText}
+            onConfirmOverwrite={cmdPreview.confirmOverwrite}
+            onCancelOverwrite={cmdPreview.cancelOverwrite}
+            empty={!autoArgs}
+            emptyText={
+              isSplitMode && splitGifFiles.length === 0
+                ? t("img.gifSplitNoInput")
+                : isCombineMode && combineImages.length < 2
+                  ? t("img.gifCombineNoInput")
+                  : undefined
+            }
+          />
         </div>
       </div>
     </DropZone>

@@ -283,27 +283,87 @@ fn empty_format() -> FormatInfo {
 const IMAGE_EXTS: &[&str] = &["jpg", "jpeg", "png", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif"];
 
 #[tauri::command]
-pub fn scan_directory(path: String) -> Result<Vec<String>, String> {
+pub fn scan_directory(path: String, exts: Option<Vec<String>>) -> Result<Vec<String>, String> {
     let mut results = Vec::new();
     let dir = std::path::Path::new(&path);
     if !dir.is_dir() {
         return Err("路径不是文件夹".to_string());
     }
-    scan_dir_recursive(dir, &mut results).map_err(|e| format!("扫描失败: {e}"))?;
+    // 默认图片后缀；调用方（如视频剪辑）可传入自定义后缀列表（视频等）
+    let exts = exts.map(|v| v.into_iter().map(|e| e.to_lowercase()).collect::<Vec<_>>());
+    scan_dir_recursive(dir, &mut results, &exts).map_err(|e| format!("扫描失败: {e}"))?;
     Ok(results)
 }
 
-fn scan_dir_recursive(dir: &std::path::Path, results: &mut Vec<String>) -> std::io::Result<()> {
+fn scan_dir_recursive(
+    dir: &std::path::Path,
+    results: &mut Vec<String>,
+    exts: &Option<Vec<String>>,
+) -> std::io::Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            scan_dir_recursive(&path, results)?;
+            scan_dir_recursive(&path, results, exts)?;
         } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            if IMAGE_EXTS.contains(&ext.to_lowercase().as_str()) {
+            let ext_l = ext.to_lowercase();
+            let matched = match exts {
+                Some(list) => list.contains(&ext_l),
+                None => IMAGE_EXTS.contains(&ext_l.as_str()),
+            };
+            if matched {
                 results.push(path.to_string_lossy().to_string());
             }
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod scan_tests {
+    use super::scan_dir_recursive;
+
+    fn run(root: &std::path::Path, exts: &Option<Vec<String>>) -> Vec<String> {
+        let mut results = Vec::new();
+        scan_dir_recursive(root, &mut results, exts).unwrap();
+        results.sort();
+        results
+    }
+
+    #[test]
+    fn default_filters_images_only() {
+        let tmp = std::env::temp_dir().join(format!("ffmt-scan-test-{}", std::process::id()));
+        let sub = tmp.join("sub");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(tmp.join("a.png"), b"x").unwrap();
+        std::fs::write(tmp.join("a.mp4"), b"x").unwrap();
+        std::fs::write(sub.join("b.jpg"), b"x").unwrap();
+        std::fs::write(sub.join("b.wav"), b"x").unwrap();
+        let out = run(&tmp, &None);
+        let names: Vec<String> = out.iter().map(|p| p.replace('\\', "/")).collect();
+        assert!(names.iter().any(|p| p.ends_with("a.png")));
+        assert!(names.iter().any(|p| p.ends_with("sub/b.jpg")));
+        assert!(!names.iter().any(|p| p.ends_with(".mp4")));
+        assert!(!names.iter().any(|p| p.ends_with(".wav")));
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn custom_exts_filters_videos_recursively() {
+        let tmp = std::env::temp_dir().join(format!("ffmt-scan-test-v-{}", std::process::id()));
+        let sub = tmp.join("nested");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(tmp.join("a.mp4"), b"x").unwrap();
+        std::fs::write(tmp.join("a.png"), b"x").unwrap();
+        std::fs::write(sub.join("b.mkv"), b"x").unwrap();
+        std::fs::write(sub.join("b.jpg"), b"x").unwrap();
+        let exts = Some(vec!["mp4".to_string(), "mkv".to_string()]);
+        let out = run(&tmp, &exts);
+        let names: Vec<String> = out.iter().map(|p| p.replace('\\', "/")).collect();
+        assert!(names.iter().any(|p| p.ends_with("a.mp4")));
+        assert!(names.iter().any(|p| p.ends_with("nested/b.mkv")));
+        assert!(!names.iter().any(|p| p.ends_with(".png")));
+        assert!(!names.iter().any(|p| p.ends_with(".jpg")));
+        std::fs::remove_dir_all(&tmp).ok();
+    }
 }

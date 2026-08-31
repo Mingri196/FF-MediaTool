@@ -26,9 +26,13 @@ export function buildImageArgs(
         const q = Math.round(31 - (params.quality / 100) * 29);
         args.push(`-${preset.qualityArg}`, String(q));
       } else {
-        // webp/avif: quality 0-100
+        // webp: quality 0-100
         args.push(`-${preset.qualityArg}`, String(params.quality));
       }
+    } else if (preset.qualityArg === "crf") {
+      // avif(libaom-av1): crf 0-63，越低越好；quality 0-100 → crf 反向映射
+      const crf = Math.round(63 - (params.quality / 100) * 63);
+      args.push("-crf", String(crf));
     }
   }
 
@@ -47,7 +51,12 @@ export function buildImageArgs(
 
   if (params.format === "webp" || params.format === "avif") {
     if (isLossless) {
-      args.push("-lossless", "1");
+      if (params.format === "avif") {
+        // libaom-av1 无损需 -crf 0（-lossless 1 被 AVIF muxer 忽略）
+        args.push("-crf", "0");
+      } else {
+        args.push("-lossless", "1");
+      }
     }
     if (params.format === "webp") {
       args.push("-preset", "picture");
@@ -55,7 +64,9 @@ export function buildImageArgs(
     }
     if (params.format === "avif") {
       if (params.avifSpeed >= 0) args.push("-cpu-used", String(params.avifSpeed));
-      if (params.avifDepth > 8) args.push("-pix_fmt", "yuv420p10le");
+      // 显式像素格式：JPG 输入为 yuvj420p（全范围），AVIF 用 yuv420p（有限范围），
+      // 不显式指定会让 swscaler 隐式转换并打印 deprecated pixel format 警告
+      args.push("-pix_fmt", params.avifDepth > 8 ? "yuv420p10le" : "yuv420p");
     }
   }
 
@@ -159,7 +170,10 @@ function getCodec(fmt: string, lossless: boolean): CodecConfig {
     case "gif": return { codec: "gif", qualityArg: null };
     case "tiff": return { codec: "tiff", qualityArg: null };
     case "ico": return { codec: "bmp", qualityArg: null };
-    case "avif": return { codec: lossless ? "libaom-av1" : "libsvtav1", qualityArg: "quality" };
+    case "avif":
+      // libaom-av1：ffmpeg 各发行版普遍内置（libsvtav1 在 essentials 等精简版缺失，
+      // 且其 "Unknown encoder" 会导致无输出/无日志）。质量用 crf（0-63，越低越好）。
+      return { codec: "libaom-av1", qualityArg: "crf" };
     default: return { codec: "mjpeg", qualityArg: "q:v" };
   }
 }
@@ -181,4 +195,81 @@ export function genOutputPath(
   const outName = `${prefix}${base}${suffix}_${seqStr}.${ext}`;
   const dir = outputDir || (inputPath.match(/^(.+)[\\/]/)?.[1] ?? "");
   return `${dir}/${outName}`;
+}
+
+// ==================== GIF 拆分 / 合成模式（v0.83）====================
+
+/** 从文件名末尾解析数字序号；无数字返回 null。支持 1 / 01 / 001 等格式。 */
+export function parseTrailingNumber(name: string): number | null {
+  const base = name.replace(/\.[^.]+$/, "");
+  const m = base.match(/(\d+)\s*$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** 按文件名末尾数字序号升序排序；无序号的图片排在前面（保持原相对顺序）。 */
+export function sortByTrailingNumber<T extends { name: string }>(items: T[]): T[] {
+  const numbered = items
+    .map((item, i) => ({ item, i, num: parseTrailingNumber(item.name) }))
+    .filter((x): x is { item: T; i: number; num: number } => x.num !== null)
+    .sort((a, b) => a.num - b.num || a.i - b.i);
+  const unnumbered = items
+    .map((item, i) => ({ item, i, num: parseTrailingNumber(item.name) }))
+    .filter((x) => x.num === null)
+    .map((x) => x.item);
+  return [...unnumbered, ...numbered.map((x) => x.item)];
+}
+
+/** 拆分模式命令：GIF → PNG 帧序列
+ * - 输入：单个 GIF 文件
+ * - 输出：`${dir}/${base}-%02d.png`（如 demo-01.png、demo-02.png…），
+ *   由 ffmpeg 一次性写入全部帧；outputPattern 同时作为任务 outputPath（任务引擎不校验存在性）
+ * - `-fps_mode vfr` 保留 GIF 全部帧（避免按固定 fps 丢帧）
+ */
+export function buildGifSplitArgs(
+  input: string,
+  outputDir: string,
+): { args: string[]; outputPattern: string } {
+  const base = input.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") ?? "frame";
+  const dir = outputDir || (input.match(/^(.+)[\\/]/)?.[1] ?? "");
+  const outputPattern = `${dir}/${base}-%02d.png`;
+  const args = ["-i", input, "-fps_mode", "vfr", outputPattern];
+  return { args, outputPattern };
+}
+
+/** 合成模式命令：图片序列（已按序号排序）→ GIF
+ * - 方案：concat demuxer + 临时列表文件（每行 `file '<path>'` + `duration <1/fps>`）
+ *   ——concat 滤镜对多个单帧图片输入会丢帧（ffmpeg 已知问题），列表文件逐帧稳定可靠。
+ * - colors<256 时 palettegen/paletteuse 限制颜色数
+ * - `-loop <loop>`：0=无限循环，-1=不循环，N=循环 N 次
+ * @param listPath 临时 concat 列表文件路径（调用方先用 write_text_file 写入内容）
+ * @returns args 完整 ffmpeg 参数
+ */
+export function buildGifCombineArgs(
+  listPath: string,
+  output: string,
+  loop: number,
+  colors: number,
+): string[] {
+  const args = ["-f", "concat", "-safe", "0", "-i", listPath];
+  if (colors < 256) {
+    args.push(
+      "-vf",
+      "split[a][b];[a]palettegen=max_colors=" + colors + "[p];[b][p]paletteuse=dither=bayer",
+    );
+  }
+  args.push("-loop", String(loop));
+  args.push(output);
+  return args;
+}
+
+/** 生成 concat 列表文件内容：每帧 `file '<path>'` + `duration <1/fps>` */
+export function buildConcatListContent(paths: string[], fps: number): string {
+  return paths
+    .map((p) => {
+      // ffmpeg 列表文件路径建议转正斜杠
+      const q = p.replace(/\\/g, "/");
+      const dur = (1 / fps).toFixed(6);
+      return `file '${q}'\nduration ${dur}\n`;
+    })
+    .join("");
 }

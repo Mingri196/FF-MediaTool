@@ -1,8 +1,11 @@
+mod background;
 mod ffmpeg;
 mod media;
 mod settings;
+mod sysinfo;
 mod task;
 mod util;
+mod window;
 
 use std::sync::Arc;
 
@@ -13,9 +16,26 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // 窗口状态恢复排除 DECORATIONS 标志：旧版保存的 decorated:true 会被恢复出来，
+        // 覆盖 decorations:false，导致系统原生标题栏+按钮与自制标题栏叠加。
+        // 仍恢复位置/大小/最大化等（StateFlags 去掉 DECORATIONS 位）。
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                        | tauri_plugin_window_state::StateFlags::VISIBLE
+                        | tauri_plugin_window_state::StateFlags::FULLSCREEN,
+                )
+                .build(),
+        )
         .manage(Arc::new(task::TaskManager::new()))
         .setup(|app| {
+            // 去原生装饰后给窗口开圆角（Win32 DWM；老系统失败静默）
+            window::apply_rounded_corners(app.handle());
+            // 后台任务：每 1000ms 读 GPU/CPU/内存 → emit 事件推送到前端自制标题栏
+            sysinfo::spawn_title_updater(app.handle().clone());
             // 启动任务调度主循环（串行队列泵）
             let manager = app.state::<Arc<task::TaskManager>>().inner().clone();
             let handle = app.handle().clone();
@@ -44,6 +64,11 @@ pub fn run() {
             util::write_text_file,
             util::check_output_file,
             util::validate_task_args,
+            background::background_get_dir,
+            background::background_import,
+            background::background_list,
+            background::background_delete,
+            sysinfo::system_stats,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

@@ -1,6 +1,5 @@
-import { Check, FolderOpen } from "lucide-react";
+import { Check, FolderOpen, Info, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,6 +17,8 @@ import {
 } from "@/theme/theme";
 import { FfmpegEnvCard } from "@/components/ffmpeg/FfmpegEnvCard";
 import { PresetManagerCard } from "@/components/presets/PresetManagerCard";
+import { CustomBackgroundCard } from "@/components/settings/CustomBackgroundCard";
+import { APP_VERSION } from "@/pages/AboutPage";
 import type { Language, ThemeMode } from "@/types";
 
 const THEME_OPTIONS: { value: ThemeMode; labelKey: "settings.appearance.theme.light" | "settings.appearance.theme.dark" | "settings.appearance.theme.system" }[] = [
@@ -27,20 +28,27 @@ const THEME_OPTIONS: { value: ThemeMode; labelKey: "settings.appearance.theme.li
 ];
 
 /** 设置页：模块一全部设置项的汇总页 */
-export function SettingsPage() {
-  const { t } = useI18n();
+export function SettingsPage({ onOpenAbout }: { onOpenAbout?: () => void }) {
+  const { t, setLang: setI18nLang } = useI18n();
   const { settings, update } = useSettings();
   const [localPaths, setLocalPaths] = useState(settings?.outputPaths ?? {});
   if (!settings) return null;
 
-  const setLang = (lang: Language) => update({ language: lang });
+  const setLang = (lang: Language) => {
+    // 同一事件处理器内同步更新 i18n（立即换文）与 settings（持久化）：
+    // React 18 自动批处理为单次渲染，彻底消除"先 settings 后 lang"的两批渲染闪烁
+    setI18nLang(lang);
+    update({ language: lang });
+  };
   const setTheme = (theme: ThemeMode) => update({ theme });
 
   const resetDefault = () => {
-    if (confirm(t("settings.outputPath.resetConfirm"))) {
-      setLocalPaths({ videoConvert: null, audioConvert: null, imageConvert: null, videoClip: null, quickTask: null });
-    }
-  };
+      if (confirm(t("settings.outputPath.resetConfirm"))) {
+        setLocalPaths({ videoConvert: null, audioConvert: null, imageConvert: null, videoClip: null, quickTask: null });
+        // 重置设置时，板块透明度 / 侧边栏与日志透明度恢复默认 100；面板效果恢复默认「模糊效果」
+                update({ panelOpacity: 100, chromeOpacity: 100, panelEffect: "blur" });
+      }
+    };
 
   return (
     <div className="h-full overflow-y-auto">
@@ -154,7 +162,10 @@ export function SettingsPage() {
               </div>
             </div>
             <Separator />
-            {/* 强调色 */}
+                        {/* 自定义背景（放在主题模式与强调色之间） */}
+                        <CustomBackgroundCard />
+                        <Separator />
+                        {/* 强调色 */}
             <div>
               <div className="mb-2 text-sm font-medium">
                 {t("settings.appearance.accentLabel")}
@@ -230,11 +241,30 @@ export function SettingsPage() {
         {/* 编码预设模板 */}
         <PresetManagerCard />
 
-        {/* 页脚版本信息 */}
-        <div className="flex items-center justify-between pb-4 pt-1 text-xs text-muted-foreground">
-          <span>FF-MediaTool v0.53 Beta</span>
-          <Badge variant="outline">Tauri 2 + React + Rust</Badge>
-        </div>
+        {/* 关于本应用 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="size-4 text-primary" />
+              {t("settings.about.title")}
+            </CardTitle>
+            <CardDescription>{t("settings.about.desc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("settings.about.version")}</span>
+              <span className="font-mono text-xs">{APP_VERSION}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("settings.about.stack")}</span>
+              <span className="font-mono text-xs">Tauri 2 + React + Rust</span>
+            </div>
+            <Button type="button" size="sm" onClick={onOpenAbout}>
+              <ArrowUpRight className="size-4" />
+              {t("settings.about.goto")}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -19,6 +19,9 @@ export const IMAGE_EXT_MAP: Record<ImageFormat, string[]> = {
 
 export type ResizeMode = "none" | "percent" | "fitWidth" | "fitHeight" | "fixed" | "custom" | "fill" | "contain" | "cover";
 
+/** GIF 输出时的处理模式：拆分（GIF→PNG 序列）/ 合成（图片序列→GIF）/ 普通转换 */
+export type GifMode = "none" | "split" | "combine";
+
 export interface ImageResize {
   mode: ResizeMode;
   value: number;
@@ -71,6 +74,7 @@ export interface ImageParams {
   gifFps: number;
   gifLoop: number;       // 0 = infinite
   gifColors: number;     // 2-256
+  gifMode: GifMode;      // GIF 拆分/合成模式（仅 format=gif 时生效，其余格式忽略）
   // 尺寸调整
   resize: ImageResize;
   // 旋转翻转
@@ -106,6 +110,7 @@ export function defaultImageParams(): ImageParams {
     gifFps: 10,
     gifLoop: 0,
     gifColors: 256,
+    gifMode: "none",
     resize: { mode: "none", value: 100, value2: 0, dpi: 72, adaptMode: "none" },
     rotate: 0,
     flipH: false,

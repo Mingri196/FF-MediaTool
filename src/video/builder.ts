@@ -32,6 +32,8 @@ export interface BuildVideoArgsInput {
 }
 
 const isCopy = (v: VideoParams) => v.vcodec === "copy";
+/** h264_mf（Media Foundation 硬编）：仅支持码率控制，不支持 CRF/preset/tune 等 */
+const isMf = (v: VideoParams) => v.vcodec === "h264_mf";
 
 /** 滤镜路径转义（Windows 路径在滤镜链内的写法） */
 export function escapeFilterPath(path: string): string {
@@ -42,6 +44,12 @@ export function escapeFilterPath(path: string): string {
 function codecArgs(v: VideoParams, out: string[]): void {
   out.push("-c:v", v.vcodec);
   if (isCopy(v)) return;
+  if (isMf(v)) {
+    // h264_mf（Media Foundation 硬编）：仅支持码率控制，不支持 CRF/preset/tune/profile/level/pix_fmt/gop 等
+    out.push("-b:v", `${v.bitrateK || 2000}k`);
+    if (v.fps > 0) out.push("-r", String(v.fps));
+    return;
+  }
   switch (v.qualityMode) {
     case "crf":
       out.push("-crf", String(v.crf));
@@ -172,6 +180,114 @@ function concatArgs(inPath: string, ranges: ClipRange[], output: string, v: Vide
   }
   out.push(output);
   return out;
+}
+
+/** 多片段拼接的片段输入（每段独立源文件；hasAudio=false 该段输出静音） */
+export interface ConcatSegmentInput {
+  path: string;
+  startSec: number;
+  endSec: number;
+  hasAudio: boolean;
+}
+
+/** 秒 → 滤镜内时间（trim/atrim/aresample 等只接受纯秒数，不能用 0:00 时:分:秒） */
+export function fmtFilterSec(sec: number): string {
+  const s = Math.max(0, sec);
+  // 整数秒直接输出整数，避免浮点尾差
+  if (Number.isInteger(s)) return String(s);
+  return s.toFixed(3).replace(/\.?0+$/, "");
+}
+
+/**
+ * 多片段拼接命令（v0.85）：多条独立源视频 → filter_complex trim/atrim + concat。
+ * - 每条片段 [i:v]trim / [i:a]atrim，输出以 setpts=PTS-STARTPTS 复位时间戳
+ * - 统一参数：scale 到目标分辨率（含 pad 黑边）+ fps + format=yuv420p；音频 aresample 统一采样率/声道
+ * - 无音频片段：anullsrc 生成对应时长静音轨（不崩溃）
+ * - 强制重编码：忽略 vcodec=copy，按 h264 输出
+ */
+export function buildMultiConcatArgs(
+  segs: ConcatSegmentInput[],
+  output: string,
+  v: VideoParams,
+  a: VideoAudioParams,
+  target: { w: number; h: number; fps: number; sampleRate: number; channels: number },
+): string[] {
+  if (segs.length < 2 || segs.length > 16) {
+    throw new Error("多片段拼接需要 2~16 段");
+  }
+  const out: string[] = [];
+  for (const s of segs) {
+    out.push("-i", s.path);
+  }
+  const fcParts: string[] = [];
+  const vRefs: string[] = [];
+  const aRefs: string[] = [];
+  const dur = (s: ConcatSegmentInput) => Math.max(0.001, s.endSec - s.startSec);
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
+    const d = dur(s);
+    // 视频：trim → 复位 → 统一分辨率（scale+pad 黑边）→ 统一帧率 → 像素格式
+    const vChain =
+      `trim=start=${fmtFilterSec(s.startSec)}:end=${fmtFilterSec(s.endSec)},` +
+      `setpts=PTS-STARTPTS,` +
+      `scale=${target.w}:${target.h}:force_original_aspect_ratio=decrease,` +
+      `pad=${target.w}:${target.h}:(ow-iw)/2:(oh-ih)/2:black,` +
+      `fps=${target.fps},format=yuv420p`;
+    fcParts.push(`[${i}:v]${vChain}[v${i}]`);
+    vRefs.push(`[v${i}]`);
+    if (s.hasAudio) {
+      const aChain =
+        `atrim=start=${fmtFilterSec(s.startSec)}:end=${fmtFilterSec(s.endSec)},` +
+        `asetpts=PTS-STARTPTS,` +
+        `aresample=${target.sampleRate},` +
+        `aformat=sample_fmts=fltp:channel_layouts=stereo`;
+      fcParts.push(`[${i}:a]${aChain}[a${i}]`);
+    } else {
+      // 无音频：anullsrc 生成静音轨（时长=片段时长）
+      fcParts.push(
+        `anullsrc=r=${target.sampleRate}:cl=stereo,` +
+          `atrim=start=0:end=${fmtFilterSec(d)},asetpts=PTS-STARTPTS[a${i}]`,
+      );
+    }
+    aRefs.push(`[a${i}]`);
+  }
+  fcParts.push(`${vRefs.join("")}concat=n=${segs.length}:v=1:a=0[vout]`);
+  fcParts.push(`${aRefs.join("")}concat=n=${segs.length}:v=0:a=1[aout]`);
+  out.push("-filter_complex", fcParts.join(";"));
+  out.push("-map", "[vout]", "-map", "[aout]");
+  // 强制重编码：vcodec=copy 时回退 h264（多片段拼接不支持流复制）
+  const effV: VideoParams = v.vcodec === "copy" ? { ...v, vcodec: "libx264" } : v;
+  codecArgs(effV, out);
+  audioArgs(a, out);
+  if (output.toLowerCase().endsWith(".mp4") || output.toLowerCase().endsWith(".m4v")) {
+    out.push("-movflags", "+faststart");
+  }
+  out.push(output);
+  return out;
+}
+
+/** 多片段拼接统一目标参数（依据第一条片段探测信息 + 用户缩放/编码设置） */
+export function resolveConcatTarget(
+  first: { width: number | null; height: number | null },
+  v: VideoParams,
+  a: VideoAudioParams,
+): { w: number; h: number; fps: number; sampleRate: number; channels: number } {
+  let w = 1280;
+  let h = 720;
+  if (v.scaleMode === 1 && v.scaleW > 0 && v.scaleH > 0) {
+    w = v.scaleW;
+    h = v.scaleH;
+  } else if (v.scaleMode === 2 && v.scaleWidth > 0) {
+    w = v.scaleWidth;
+    h = Math.max(2, Math.round((v.scaleWidth * 9) / 16));
+  } else if (first.width && first.height && first.width > 0 && first.height > 0) {
+    w = first.width;
+    h = first.height;
+  }
+  const fps = v.fps > 0 ? v.fps : 30;
+  const sampleRate = a.sampleRate > 0 ? a.sampleRate : 48000;
+  const channels = a.channels > 0 ? Math.max(1, Math.min(2, a.channels)) : 2;
+  return { w, h, fps, sampleRate, channels };
 }
 
 /**

@@ -51,6 +51,49 @@ pub struct AppSettings {
     /// 各功能模块的默认输出路径（自定义；为空时使用全局 opt 目录）
     #[serde(default)]
     pub output_paths: OutputPaths,
+    /// 侧边栏是否收起（快捷键 A/← 收起，D/→ 展开；持久化，重启保持）
+    #[serde(default)]
+    pub sidebar_collapsed: bool,
+    /// 是否启用自定义背景（关闭时使用程序默认背景）
+    #[serde(default)]
+    pub background_enabled: bool,
+    /// 当前使用的背景素材文件名（Background 目录内副本，不保存外部路径）
+    #[serde(default)]
+    pub background_file: Option<String>,
+    /// 背景透明度 0-100
+    #[serde(default = "default_background_opacity")]
+    pub background_opacity: u8,
+    /// 板块透明度 0-100（各功能页卡片容器背景；默认 100 不透明）
+    #[serde(default = "default_background_opacity")]
+    pub panel_opacity: u8,
+    /// 侧边栏与运行日志透明度 0-100（独立参数；默认 100 不透明）
+    #[serde(default = "default_background_opacity")]
+    pub chrome_opacity: u8,
+    /// 面板效果："blur" 毛玻璃模糊（默认）/ "transparent" 透明无模糊（仅开启自定义背景时生效）
+    #[serde(default = "default_panel_effect")]
+    pub panel_effect: String,
+    /// 视频背景播放速度 0.5-2.0
+    #[serde(default = "default_background_speed")]
+    pub background_video_speed: f64,
+    /// 运行日志面板状态："collapsed" | "expanded" | "hidden"（Tab 快捷键控制；持久化，重启恢复）
+    #[serde(default = "default_log_panel_state")]
+    pub log_panel_state: String,
+}
+
+fn default_log_panel_state() -> String {
+    "collapsed".into()
+}
+
+fn default_panel_effect() -> String {
+    "blur".into()
+}
+
+fn default_background_opacity() -> u8 {
+    100
+}
+
+fn default_background_speed() -> f64 {
+    1.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +126,15 @@ impl Default for AppSettings {
             presets: Vec::new(),
             has_completed_first_run: false,
             output_paths: OutputPaths::default(),
+            sidebar_collapsed: false,
+            background_enabled: false,
+            background_file: None,
+            background_opacity: default_background_opacity(),
+            panel_opacity: default_background_opacity(),
+            chrome_opacity: default_background_opacity(),
+            panel_effect: default_panel_effect(),
+            background_video_speed: default_background_speed(),
+            log_panel_state: default_log_panel_state(),
         }
     }
 }
@@ -97,6 +149,14 @@ fn sanitize(mut s: AppSettings) -> AppSettings {
     }
     if !is_valid_hex_color(&s.accent_color) {
         s.accent_color = "#4f46e5".into();
+    }
+    // 日志面板状态只允许三值
+    if !matches!(s.log_panel_state.as_str(), "collapsed" | "expanded" | "hidden") {
+        s.log_panel_state = "collapsed".into();
+    }
+    // 面板效果只允许 blur / transparent
+    if !matches!(s.panel_effect.as_str(), "blur" | "transparent") {
+        s.panel_effect = default_panel_effect();
     }
     // 预设 id 去重（保留首个）
     let mut seen = std::collections::HashSet::new();

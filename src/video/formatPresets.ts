@@ -49,6 +49,7 @@ export const VIDEO_CODECS: { value: VideoCodec; labelKey: string; group: string 
   { value: "h264_qsv", labelKey: "codec.h264Qsv", group: "hw" },
   { value: "hevc_qsv", labelKey: "codec.hevcQsv", group: "hw" },
   { value: "h264_amf", labelKey: "codec.h264Amf", group: "hw" },
+  { value: "h264_mf", labelKey: "codec.h264Mf", group: "hw" },
   { value: "copy", labelKey: "codec.copy", group: "copy" },
 ];
 

@@ -4,6 +4,8 @@ import type { AudioCodec, AudioParams } from "./types";
 /** 输出格式 → 默认编码器/质量 智能匹配表（PRD 4.1） */
 export interface AudioFormatPreset {
   ext: string;
+  /** 下拉选项内部 value（默认等于 ext；WavPack 用 wavpack，输出扩展名仍为 .wv） */
+  value?: string;
   label: I18nKey;
   acodec: AudioCodec;
   mode: AudioParams["mode"];
@@ -23,8 +25,15 @@ export const AUDIO_FORMATS: AudioFormatPreset[] = [
   { ext: "flac", label: "afmt.flac", acodec: "flac", mode: "lossless", bitrateK: 0, vbrQuality: 0, lossless: true },
   { ext: "wav", label: "afmt.wav", acodec: "pcm_s16le", mode: "lossless", bitrateK: 0, vbrQuality: 0, lossless: true },
   { ext: "aiff", label: "afmt.aiff", acodec: "pcm_s16le", mode: "lossless", bitrateK: 0, vbrQuality: 0, lossless: true },
-  { ext: "wv", label: "afmt.wv", acodec: "wavpack", mode: "lossless", bitrateK: 0, vbrQuality: 0, lossless: true },
+  { ext: "wv", value: "wavpack", label: "afmt.wv", acodec: "wavpack", mode: "lossless", bitrateK: 0, vbrQuality: 0, lossless: true },
 ];
+
+/** 下拉选项内部 value（WavPack → "wavpack"，其余 == ext） */
+export const formatValue = (f: AudioFormatPreset): string => f.value ?? f.ext;
+
+/** 由下拉 value 反查输出扩展名（wavpack → wv；未知时原样返回） */
+export const extOfValue = (v: string): string =>
+  AUDIO_FORMATS.find((f) => formatValue(f) === v)?.ext ?? v;
 
 /** 可用音频编码器 */
 export const AUDIO_CODECS: { value: AudioCodec; labelKey: I18nKey; group: "lossy" | "lossless" | "copy" }[] = [

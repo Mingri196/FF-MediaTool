@@ -34,7 +34,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const failedRef = useRef(false);
 
-  // 启动时从后端加载
+  // 启动时从后端加载（只加载一次；t 变化不应重新触发，否则语言切换会引起二次渲染闪烁）
   useEffect(() => {
     let cancelled = false;
     api
@@ -54,14 +54,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const persist = useCallback(
     async (next: AppSettings): Promise<boolean> => {
       try {
         const saved = await api.saveSettings(next);
         latestRef.current = saved;
-        setSettings(saved);
+        // 内容一致时不更新 state，避免语言切换等场景下 300ms 防抖保存后再次全树渲染（闪烁）
+        setSettings((prev) =>
+          prev && JSON.stringify(prev) === JSON.stringify(saved) ? prev : saved,
+        );
         return true;
       } catch (e) {
         console.error("保存设置失败", e);

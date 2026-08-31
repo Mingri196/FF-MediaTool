@@ -70,7 +70,10 @@ function VideoCard({
 }) {
   const { t } = useI18n();
   const copy = video.vcodec === "copy";
+  // h264_mf（Media Foundation 硬编）：仅支持码率控制，不支持 CRF/preset/tune/profile/level/pix_fmt/gop 等
+  const mf = video.vcodec === "h264_mf";
   const dis = disabled || copy;
+  const mfDis = disabled || mf;
 
   const set = (patch: Partial<VideoParams>) => onChange({ ...video, ...patch });
 
@@ -85,7 +88,18 @@ function VideoCard({
       {/* 编码器 */}
       <div className="space-y-1.5 sm:col-span-2">
         <Label>{t("video.vcodec")}</Label>
-        <Select value={video.vcodec} onValueChange={(v) => set({ vcodec: v as VideoParams["vcodec"] })}>
+        <Select
+          value={video.vcodec}
+          onValueChange={(v) => {
+            const vc = v as VideoParams["vcodec"];
+            // 切到 h264_mf：自动切 ABR 码率模式（不支持 CRF/CBR 的 maxrate/bufsize）
+            const patch: Partial<VideoParams> = { vcodec: vc };
+            if (vc === "h264_mf" && video.qualityMode !== "abr") {
+              patch.qualityMode = "abr";
+            }
+            set(patch);
+          }}
+        >
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -103,9 +117,10 @@ function VideoCard({
           </SelectContent>
         </Select>
         {copy && <p className="text-xs text-muted-foreground">{t("codec.copyHint")}</p>}
+        {mf && <p className="text-xs text-muted-foreground">{t("codec.h264MfHint")}</p>}
       </div>
 
-      {/* 质量模式 + CRF */}
+      {/* 质量模式 + CRF（h264_mf 仅支持码率控制，CRF/CBR 不支持 → 置灰） */}
       <div className="space-y-1.5 sm:col-span-2">
         <Label>{t("video.qualityMode")}</Label>
         <div className="flex flex-wrap gap-1.5">
@@ -115,7 +130,7 @@ function VideoCard({
               type="button"
               size="sm"
               variant={video.qualityMode === m.value ? "default" : "outline"}
-              disabled={dis}
+              disabled={dis || (mf && m.value !== "abr")}
               onClick={() => set({ qualityMode: m.value })}
             >
               {t(m.labelKey)}
@@ -130,7 +145,7 @@ function VideoCard({
           dis && "pointer-events-none opacity-50",
         )}
       >
-        {video.qualityMode === "crf" && (
+        {video.qualityMode === "crf" && !mf && (
           <>
             <div className="flex items-center justify-between">
               <Label className="cursor-default">CRF</Label>
@@ -163,7 +178,7 @@ function VideoCard({
                 onChange={(e) => set({ bitrateK: Math.max(0, Number(e.target.value) || 0) })}
               />
             </div>
-            {video.qualityMode === "cbr" && (
+            {video.qualityMode === "cbr" && !mf && (
               <>
                 <div className="space-y-1">
                   <Label>{t("quality.maxrate")}</Label>
@@ -193,10 +208,10 @@ function VideoCard({
         )}
       </div>
 
-      {/* 基础参数 */}
+      {/* 基础参数：preset/tune/profile/level/pix_fmt（h264_mf 不支持，禁用）；fps 保留 */}
       <div className="space-y-1.5">
         <Label>{t("video.presetSpeed")}</Label>
-        <Select value={video.preset} onValueChange={(v) => set({ preset: v as VideoParams["preset"] })} disabled={dis}>
+        <Select value={video.preset} onValueChange={(v) => set({ preset: v as VideoParams["preset"] })} disabled={mfDis}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {X264_PRESETS.map((p) => (
@@ -207,8 +222,8 @@ function VideoCard({
       </div>
       <div className="space-y-1.5">
         <Label>{t("video.tune")}</Label>
-        <Select value={video.tune} onValueChange={(v) => set({ tune: v as VideoParams["tune"] })} disabled={dis}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+        <Select value={video.tune} onValueChange={(v) => set({ tune: v as VideoParams["tune"] })} disabled={mfDis}>
+          <SelectTrigger><SelectValue placeholder={t("common.auto")} /></SelectTrigger>
           <SelectContent>
             {TUNES.map((p) => (
               <SelectItem key={p} value={p}>{p || t("common.auto")}</SelectItem>
@@ -218,8 +233,8 @@ function VideoCard({
       </div>
       <div className="space-y-1.5">
         <Label>{t("video.profile")}</Label>
-        <Select value={video.profile} onValueChange={(v) => v !== null && set({ profile: v })} disabled={dis}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+        <Select value={video.profile} onValueChange={(v) => v !== null && set({ profile: v })} disabled={mfDis}>
+          <SelectTrigger><SelectValue placeholder={t("common.auto")} /></SelectTrigger>
           <SelectContent>
             {PROFILES.map((p) => (
               <SelectItem key={p} value={p}>{p || t("common.auto")}</SelectItem>
@@ -229,8 +244,8 @@ function VideoCard({
       </div>
       <div className="space-y-1.5">
         <Label>{t("video.level")}</Label>
-        <Select value={video.level} onValueChange={(v) => v !== null && set({ level: v })} disabled={dis}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+        <Select value={video.level} onValueChange={(v) => v !== null && set({ level: v })} disabled={mfDis}>
+          <SelectTrigger><SelectValue placeholder={t("common.auto")} /></SelectTrigger>
           <SelectContent>
             {LEVELS.map((p) => (
               <SelectItem key={p} value={p}>{p || t("common.auto")}</SelectItem>
@@ -240,8 +255,8 @@ function VideoCard({
       </div>
       <div className="space-y-1.5">
         <Label>{t("video.pixFmt")}</Label>
-        <Select value={video.pixFmt} onValueChange={(v) => set({ pixFmt: v as VideoParams["pixFmt"] })} disabled={dis}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+        <Select value={video.pixFmt} onValueChange={(v) => set({ pixFmt: v as VideoParams["pixFmt"] })} disabled={mfDis}>
+          <SelectTrigger><SelectValue placeholder={t("common.auto")} /></SelectTrigger>
           <SelectContent>
             {PIX_FMTS.map((p) => (
               <SelectItem key={p.value} value={p.value}>{t(p.labelKey)}</SelectItem>
@@ -339,7 +354,7 @@ function VideoCard({
               step={10}
               value={video.gop || ""}
               placeholder={t("common.auto")}
-              disabled={dis}
+              disabled={mfDis}
               onChange={(e) => set({ gop: Math.max(0, Number(e.target.value) || 0) })}
             />
           </div>
@@ -349,7 +364,7 @@ function VideoCard({
               type="number"
               min={-1}
               value={video.bframes}
-              disabled={dis}
+              disabled={mfDis}
               onChange={(e) => set({ bframes: Number(e.target.value) })}
             />
           </div>
@@ -360,7 +375,7 @@ function VideoCard({
               min={0}
               value={video.refs || ""}
               placeholder={t("common.auto")}
-              disabled={dis}
+              disabled={mfDis}
               onChange={(e) => set({ refs: Math.max(0, Number(e.target.value) || 0) })}
             />
           </div>
@@ -368,7 +383,7 @@ function VideoCard({
             <Checkbox
               id="sc-threshold"
               checked={video.scThreshold}
-              disabled={dis}
+              disabled={mfDis}
               onCheckedChange={(c) => set({ scThreshold: !!c })}
             />
             <label htmlFor="sc-threshold" className="text-sm">{t("video.scThreshold")}</label>

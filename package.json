@@ -1,7 +1,7 @@
 {
   "name": "ff-mediatool",
   "private": true,
-  "version": "0.53.0",
+  "version": "0.87.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -29,9 +29,12 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",

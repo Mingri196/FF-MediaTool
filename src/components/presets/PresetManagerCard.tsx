@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Trash2, Video, AudioLines } from "lucide-react";
+import { Pencil, Trash2, Video, AudioLines, ImageIcon, Scissors } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,11 +35,29 @@ import { useI18n } from "@/i18n";
 import { useSettings } from "@/settings/SettingsProvider";
 import type { EncoderPreset } from "@/types";
 
+/** 预设类型定义（与 EncoderPreset.category 对齐） */
+const CATEGORIES = ["video", "audio", "image", "clip"] as const;
+type PresetCategory = (typeof CATEGORIES)[number];
+
+const CATEGORY_ICONS: Record<PresetCategory, typeof Video> = {
+  video: Video,
+  audio: AudioLines,
+  image: ImageIcon,
+  clip: Scissors,
+};
+
+const CATEGORY_KEYS: Record<PresetCategory, string> = {
+  video: "settings.presets.categoryVideo",
+  audio: "settings.presets.categoryAudio",
+  image: "settings.presets.categoryImage",
+  clip: "settings.presets.categoryClip",
+};
+
 /**
  * 编码预设模板管理（设置页）：
  * - 列表展示（名称 / 类型 / 创建时间）
- * - 新建（模块一先建空模板占位；模块三/四转换页会把当前参数写入 params）
  * - 重命名 / 删除（确认弹窗）
+ * - 清除所有预设（二次确认弹窗，清空全部类型预设）
  * 数据存于 AppSettings.presets，持久化走后端 settings.json。
  */
 export function PresetManagerCard() {
@@ -49,20 +67,14 @@ export function PresetManagerCard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<EncoderPreset | null>(null);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<"video" | "audio">("video");
+  const [category, setCategory] = useState<PresetCategory>("video");
   const [deleting, setDeleting] = useState<EncoderPreset | null>(null);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
 
   const presets = useMemo(
     () => [...(settings?.presets ?? [])].sort((a, b) => b.createdAt - a.createdAt),
     [settings?.presets],
   );
-
-  const openCreate = () => {
-    setEditing(null);
-    setName("");
-    setCategory("video");
-    setDialogOpen(true);
-  };
 
   const openRename = (p: EncoderPreset) => {
     setEditing(p);
@@ -107,6 +119,13 @@ export function PresetManagerCard() {
     setDeleting(null);
   };
 
+  /** 清除全部预设（四类全清；recentPresets 一并清空，不影响其它设置） */
+  const confirmClearAll = () => {
+    if (!settings) return;
+    update({ presets: [], recentPresets: [] });
+    setClearAllOpen(false);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -115,9 +134,14 @@ export function PresetManagerCard() {
             <CardTitle>{t("settings.presets.title")}</CardTitle>
             <CardDescription>{t("settings.presets.desc")}</CardDescription>
           </div>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="size-4" />
-            {t("settings.presets.new")}
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setClearAllOpen(true)}
+            disabled={presets.length === 0}
+          >
+            <Trash2 className="size-4" />
+            {t("settings.presets.clearAll")}
           </Button>
         </div>
       </CardHeader>
@@ -140,9 +164,7 @@ export function PresetManagerCard() {
                         {p.name}
                       </span>
                       <Badge variant="secondary">
-                        {p.category === "video"
-                          ? t("settings.presets.categoryVideo")
-                          : t("settings.presets.categoryAudio")}
+                        {t(CATEGORY_KEYS[p.category] as never, { defaultValue: p.category })}
                       </Badge>
                     </div>
                     <div className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -204,25 +226,22 @@ export function PresetManagerCard() {
             </div>
             <div className="space-y-1.5">
               <Label>{t("settings.presets.categoryLabel")}</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={category === "video" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCategory("video")}
-                >
-                  <Video className="size-3.5" />
-                  {t("settings.presets.categoryVideo")}
-                </Button>
-                <Button
-                  type="button"
-                  variant={category === "audio" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCategory("audio")}
-                >
-                  <AudioLines className="size-3.5" />
-                  {t("settings.presets.categoryAudio")}
-                </Button>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map((c) => {
+                  const Icon = CATEGORY_ICONS[c];
+                  return (
+                    <Button
+                      key={c}
+                      type="button"
+                      variant={category === c ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCategory(c)}
+                    >
+                      <Icon className="size-3.5" />
+                      {t(CATEGORY_KEYS[c] as never)}
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -253,6 +272,26 @@ export function PresetManagerCard() {
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={confirmDelete}>
               {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 清除所有预设确认对话框 */}
+      <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("settings.presets.clearAll")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("settings.presets.clearAllConfirm")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setClearAllOpen(false)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmClearAll}>
+              {t("settings.presets.clearAllAction")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -41,10 +41,14 @@ interface TaskContextValue {
   stopping: boolean;
   logs: Map<string, LogEntry[]>;
   seqRef: React.MutableRefObject<number>;
+  /** 任务归属标签映射：taskId -> tabId（多标签隔离用；无归属的任务缺省为空串） */
+  taskTabMap: Map<string, string>;
   addTask: (task: NewTask) => Promise<TaskInfo | null>;
-  /** 带文件保护 + 参数校验的添加任务（PRD 6.3） */
-  guardAddTask: (task: NewTask) => Promise<void>;
+  /** 带文件保护 + 参数校验的添加任务（PRD 6.3）；tabId 用于任务归属标签（多标签隔离） */
+  guardAddTask: (task: NewTask, tabId?: string) => Promise<void>;
   stopTask: (id: string) => Promise<void>;
+  /** 停止某标签归属的所有运行/排队任务（关闭标签时使用） */
+  stopTabTasks: (tabId: string) => Promise<void>;
   removeTask: (id: string) => Promise<void>;
   reorderTask: (id: string, dir: "up" | "down") => Promise<void>;
   clearFinished: () => Promise<void>;
@@ -63,6 +67,10 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const [logs, setLogs] = useState<Map<string, LogEntry[]>>(new Map());
   const seqRef = useRef(0);
   const [conflict, setConflict] = useState<{ task: NewTask; resolve: (action: "overwrite" | "rename" | "cancel") => void } | null>(null);
+  // 任务归属标签：taskId -> tabId（"" 表示无归属 / 全局任务）
+  const [taskTabMap, setTaskTabMap] = useState<Map<string, string>>(new Map());
+  const taskTabRef = useRef<Map<string, string>>(new Map());
+  taskTabRef.current = taskTabMap;
 
   // ---- 事件订阅 ----
   useEffect(() => {
@@ -137,9 +145,14 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
   // ---- 动作 ----
   const addTask = useCallback(
-    async (task: NewTask): Promise<TaskInfo | null> => {
+    async (task: NewTask, tabId?: string): Promise<TaskInfo | null> => {
       try {
-        return await taskApi.add(task);
+        const created = await taskApi.add(task);
+        if (created) {
+          // 记录任务归属标签（复制/关闭标签时需要）
+          setTaskTabMap((prev) => new Map(prev).set(created.id, tabId ?? ""));
+        }
+        return created;
       } catch (e) {
         console.error(e);
         toast.error(t("error.taskAddFailed"));
@@ -151,7 +164,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
   /** 带文件保护 + 参数校验的添加任务（PRD 6.3） */
   const guardAddTask = useCallback(
-    async (task: NewTask) => {
+    async (task: NewTask, tabId?: string) => {
       if (task.args.length === 0) {
         toast.error(t("error.taskAddFailed"));
         return;
@@ -173,13 +186,13 @@ export function TaskProvider({ children }: { children: ReactNode }) {
                 t.name = `${t.inputPath.split(/[\\/]/).pop() ?? ""} → ${t.outputPath.split(/[\\/]/).pop() ?? ""}`;
                 if (t.args.length > 0) t.args[t.args.length - 1] = t.outputPath;
               }
-              addTask(t);
+              addTask(t, tabId);
               resolve();
             }});
           });
         }
       } catch { /* 检查失败则继续 */ }
-      addTask(task);
+      addTask(task, tabId);
     },
     [addTask, t],
   );
@@ -258,13 +271,31 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     [t],
   );
 
+  /** 停止某标签归属的所有运行/排队任务（关闭标签时使用） */
+  const stopTabTasks = useCallback(
+    async (tabId: string) => {
+      for (const [taskId, owner] of taskTabRef.current) {
+        if (owner !== tabId) continue;
+        const task = tasks.get(taskId);
+        if (task && (task.status === "running" || task.status === "queued")) {
+          try {
+            await taskApi.stop(taskId);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+    },
+    [tasks],
+  );
+
   const value = useMemo<TaskContextValue>(
     () => ({
-      tasks, queueIds, currentId, stopping, logs, seqRef,
+      tasks, queueIds, currentId, stopping, logs, seqRef, taskTabMap,
       addTask, guardAddTask, stopTask, removeTask, reorderTask,
-      clearFinished, clearLog, statusLabel,
+      clearFinished, clearLog, statusLabel, stopTabTasks,
     }),
-    [tasks, queueIds, currentId, stopping, logs, addTask, guardAddTask, stopTask, removeTask, reorderTask, clearFinished, clearLog, statusLabel],
+    [tasks, queueIds, currentId, stopping, logs, taskTabMap, addTask, guardAddTask, stopTask, removeTask, reorderTask, clearFinished, clearLog, statusLabel, stopTabTasks],
   );
 
   return (

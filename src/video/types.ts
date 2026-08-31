@@ -13,6 +13,7 @@ export type VideoCodec =
   | "h264_qsv"
   | "hevc_qsv"
   | "h264_amf"
+  | "h264_mf"
   | "wmv2"
   | "copy";
 

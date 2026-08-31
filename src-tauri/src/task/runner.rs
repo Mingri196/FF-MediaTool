@@ -234,6 +234,12 @@ pub async fn run_task(
     })
     .await;
 
+    // 兜底：进程秒退（如命令非法）时，主循环可能已被 child.wait() 打断，
+    // 残余的 stderr 日志还在通道里未消费 → 全部补发，保证运行日志不空白
+    while let Ok((line, level)) = log_rx.try_recv() {
+        emit_log(app, &task_id, &line, &level);
+    }
+
     let code = exit_status.ok().and_then(|s| s.code()).unwrap_or(-1);
     let err = if code != 0 {
         // 若进程是被 kill 掉的（code None 或非 0），可能是用户停止；
@@ -274,7 +280,7 @@ fn emit_task(app: &AppHandle, task: &TaskInfo) {
     );
 }
 
-fn emit_log(app: &AppHandle, task_id: &str, line: &str, level: &str) {
+pub fn emit_log(app: &AppHandle, task_id: &str, line: &str, level: &str) {
     let _ = app.emit(
         TASK_EVENT,
         serde_json::json!({

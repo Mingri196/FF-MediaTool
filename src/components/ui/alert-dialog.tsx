@@ -2,10 +2,16 @@ import * as React from "react"
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog"
 
 import { cn } from "@/lib/utils"
+import { registerDialogClose } from "@/lib/dialogRegistry"
 import { Button } from "@/components/ui/button"
 
-function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
-  return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
+function AlertDialog({ open, onOpenChange, ...props }: AlertDialogPrimitive.Root.Props) {
+  // 打开时注册到全局弹窗栈，ESC 快捷键据此关闭本弹窗
+  React.useEffect(() => {
+    if (!open) return;
+    return registerDialogClose(() => onOpenChange?.(false, undefined as never));
+  }, [open, onOpenChange]);
+  return <AlertDialogPrimitive.Root data-slot="alert-dialog" open={open} onOpenChange={onOpenChange} {...props} />
 }
 
 function AlertDialogTrigger({ ...props }: AlertDialogPrimitive.Trigger.Props) {

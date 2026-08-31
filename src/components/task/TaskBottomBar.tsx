@@ -11,35 +11,71 @@ import { useTasks } from "@/tasks/TaskProvider";
 import { formatMs } from "@/lib/format";
 import { analyzeFfmpegError } from "@/lib/ffmpegErrors";
 
+/** 日志面板三态：收起（小条）/ 展开（完整面板）/ 隐藏（整个组件消失） */
+export type LogPanelState = "collapsed" | "expanded" | "hidden";
+
 /** 展开高度：占主窗口垂直空间 ~45% */
 const EXPANDED_HEIGHT_PCT = 0.45;
 
-export function TaskBottomBar() {
+export function TaskBottomBar({
+  state,
+  onStateChange,
+  tabId,
+}: {
+  state: LogPanelState;
+  onStateChange: (s: LogPanelState) => void;
+  /** 标签 id：只展示属于该标签的任务/日志（多标签隔离）；缺省展示全局 */
+  tabId?: string;
+}) {
   const { t } = useI18n();
-  const { tasks, queueIds, currentId, stopping, logs, guardAddTask, stopTask, clearLog, statusLabel } =
+  const { tasks, queueIds, currentId, stopping, logs, taskTabMap, guardAddTask, stopTask, clearLog, statusLabel } =
     useTasks();
   const [quickOpen, setQuickOpen] = useState(false);
-  const [logExpanded, setLogExpanded] = useState(false);
   const [logWidth, setLogWidth] = useState(loadLogWidth);
 
-  const current = currentId ? tasks.get(currentId) ?? null : null;
+  const logExpanded = state === "expanded";
+
+  // 多标签过滤：只保留归属于本标签（tabId）的任务；缺省 tabId 展示全部
+  const ownIds = useMemo(() => {
+    if (!tabId) return null; // 全局视图
+    const set = new Set<string>();
+    for (const [taskId, owner] of taskTabMap) {
+      if (owner === tabId) set.add(taskId);
+    }
+    return set;
+  }, [tabId, taskTabMap]);
+
+  const ownTasks = useMemo(() => {
+    if (!ownIds) return tasks;
+    const m = new Map<string, typeof tasks extends Map<string, infer V> ? V : never>();
+    for (const id of ownIds) {
+      const task = tasks.get(id);
+      if (task) m.set(id, task);
+    }
+    return m;
+  }, [ownIds, tasks]);
+
+  const ownQueueIds = useMemo(() => (ownIds ? queueIds.filter((id) => ownIds.has(id)) : queueIds), [ownIds, queueIds]);
+  const ownCurrentId = ownIds && currentId && ownIds.has(currentId) ? currentId : null;
+
+  const current = ownCurrentId ? ownTasks.get(ownCurrentId) ?? null : null;
   const logTaskId = useMemo(() => {
-    if (currentId) return currentId;
-    if (queueIds.length > 0) return queueIds[0];
+    if (ownCurrentId) return ownCurrentId;
+    if (ownQueueIds.length > 0) return ownQueueIds[0];
     let best: { id: string; at: number } | null = null;
-    for (const task of tasks.values()) {
+    for (const task of ownTasks.values()) {
       if (task.finishedAt && (!best || task.finishedAt > best.at)) {
         best = { id: task.id, at: task.finishedAt };
       }
     }
     return best?.id ?? null;
-  }, [currentId, queueIds, tasks]);
+  }, [ownCurrentId, ownQueueIds, ownTasks]);
 
   const logEntries = logTaskId ? logs.get(logTaskId) ?? [] : [];
-  const logTask = logTaskId ? tasks.get(logTaskId) : null;
+  const logTask = logTaskId ? ownTasks.get(logTaskId) : null;
 
   const running = !!current && current.status === "running";
-  const queuedCount = queueIds.length;
+  const queuedCount = ownQueueIds.length;
 
   const { percent, timeMs, durationMs, speed, etaMs } = current?.progress ?? {
     percent: -1, timeMs: 0, durationMs: 0, speed: 0, etaMs: -1,
@@ -57,10 +93,16 @@ export function TaskBottomBar() {
     return analyzeFfmpegError(logEntries.map((e) => e.line).join("\n"));
   }, [logTask, logEntries]);
 
+  // 完全隐藏：整个组件不渲染（透明度参数随之不生效；恢复后立即生效）
+  if (state === "hidden") return null;
+
   return (
     <div
+      data-slot="taskbar"
       className={cn(
-        "flex shrink-0 flex-col border-t border-border bg-background transition-[height] duration-200 ease-out",
+        "flex shrink-0 flex-col border-t border-border transition-[height] duration-200 ease-out",
+        // 开启自定义背景时：日志面板半透明磨砂（由 AppShell 的 bg-glass-enabled 驱动）
+        "bg-background",
         logExpanded ? "min-h-0" : "h-[200px]",
       )}
       style={logExpanded ? { height: `${Math.round(window.innerHeight * EXPANDED_HEIGHT_PCT)}px` } : undefined}
@@ -178,7 +220,7 @@ export function TaskBottomBar() {
               emptyText={logTask ? t("taskbar.log.empty") : t("taskbar.noTask")}
               className="h-full shrink-0 border-l border-border"
               expanded
-              onToggleExpanded={() => setLogExpanded(false)}
+              onToggleExpanded={() => onStateChange("collapsed")}
               width={logWidth}
               onResizeWidth={resizeWidth}
             />
@@ -192,7 +234,7 @@ export function TaskBottomBar() {
               emptyText={logTask ? t("taskbar.log.empty") : t("taskbar.noTask")}
               className="h-full rounded-md border border-border"
               expanded={false}
-              onToggleExpanded={() => setLogExpanded(true)}
+              onToggleExpanded={() => onStateChange("expanded")}
               width={logWidth}
               onResizeWidth={resizeWidth}
             />
@@ -200,7 +242,7 @@ export function TaskBottomBar() {
         )}
       </div>
 
-      <QuickTaskDialog open={quickOpen} onOpenChange={setQuickOpen} onAdd={(nt) => void guardAddTask(nt)} />
+      <QuickTaskDialog open={quickOpen} onOpenChange={setQuickOpen} onAdd={(nt) => void guardAddTask(nt, tabId)} />
     </div>
   );
 }

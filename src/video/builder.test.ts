@@ -76,6 +76,48 @@ describe("buildVideoArgs 基础", () => {
     expect(args).not.toContain("-tune");
     expect(args).not.toContain("-pix_fmt");
   });
+
+  it("h264_mf 只输出 -c:v h264_mf + -b:v，忽略 CRF/preset/tune 等", () => {
+    const args = build({
+      vcodec: "h264_mf",
+      qualityMode: "crf",
+      crf: 1,
+      preset: "placebo",
+      tune: "film",
+      profile: "high",
+      level: "5.1",
+      pixFmt: "yuv444p",
+      gop: 250,
+      bframes: 3,
+      refs: 4,
+      fps: 30,
+    });
+    expect(args).toContain("-c:v");
+    expect(args).toContain("h264_mf");
+    // 码率（crf 模式下 mf 也用 -b:v，用默认 2000k）
+    expect(args).toContain("-b:v");
+    expect(args).toContain("2000k");
+    // 不支持的全部不出现
+    expect(args).not.toContain("-crf");
+    expect(args).not.toContain("-preset");
+    expect(args).not.toContain("-tune");
+    expect(args).not.toContain("-profile:v");
+    expect(args).not.toContain("-level:v");
+    expect(args).not.toContain("-pix_fmt");
+    expect(args).not.toContain("-g");
+    expect(args).not.toContain("-bf");
+    expect(args).not.toContain("-refs");
+    expect(args).not.toContain("-sc_threshold");
+    // fps 保留
+    expect(args).toContain("-r");
+    expect(args).toContain("30");
+  });
+
+  it("h264_mf ABR 模式用用户码率", () => {
+    const args = build({ vcodec: "h264_mf", qualityMode: "abr", bitrateK: 3500 });
+    expect(args).toContain("-b:v");
+    expect(args).toContain("3500k");
+  });
 });
 
 describe("时间裁剪与格式", () => {

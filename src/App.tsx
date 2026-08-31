@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { AboutPage } from "@/pages/AboutPage";
 import { BatchPage } from "@/pages/BatchPage";
 import { VideoConvertPage } from "@/pages/VideoConvertPage";
 import { VideoClipPage } from "@/pages/VideoClipPage";
@@ -12,13 +13,27 @@ import { FirstRunDialog } from "@/components/ffmpeg/FirstRunDialog";
 import { I18nProvider, useI18n } from "@/i18n";
 import { SettingsProvider, useSettings } from "@/settings/SettingsProvider";
 import { TaskProvider } from "@/tasks/TaskProvider";
+import { TabManagerProvider, useTabManager } from "@/tabs/TabManager";
 import { applyAccent, applyThemeMode } from "@/theme/theme";
 import { api } from "@/lib/tauri";
 import type { Language, PageId } from "@/types";
 
 function Shell() {
   const { settings, update } = useSettings();
-  const [page, setPage] = useState<PageId>("settings");
+  const { tabs, activeId, setTabPage } = useTabManager();
+  // 当前激活标签的页面（侧边栏高亮 / 内容区渲染）
+  const activeTab = tabs.find((t) => t.id === activeId) ?? tabs[0];
+  const page: PageId = activeTab?.pageId ?? "settings";
+  // navigate 用 ref 读最新 activeId：renderPage 被 useMemo([]) 缓存，
+  // 若直接把 activeId 闭包进 navigate，切换标签后 Settings 的 onOpenAbout 会导航到旧标签
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+  const navigate = useCallback(
+    (p: PageId) => {
+      setTabPage(activeIdRef.current, p);
+    },
+    [setTabPage],
+  );
   const [showFirstRun, setShowFirstRun] = useState(false);
 
   // 应用主题模式 + 强调色（跟随设置实时生效）
@@ -73,31 +88,34 @@ function Shell() {
     update({ hasCompletedFirstRun: true });
   };
 
-  const main = useMemo(() => {
-      switch (page) {
-              case "settings":
-                return <SettingsPage />;
-              case "batch":
-                return <BatchPage />;
-              case "video-convert":
-                return <VideoConvertPage />;
-              case "image-convert":
-                return <ImageConvertPage />;
-              case "video-clip":
-                return <VideoClipPage />;
-              case "audio-convert":
-                return <AudioConvertPage />;
-              case "media-info":
-                return <MediaInfoPage />;
-              default:
-                return <VideoConvertPage />;
-            }
-          }, [page]);
+  // 按页面 id 渲染页面（PageStack 按需调用并缓存；about 返回即回设置页）
+  const renderPage = useMemo(() => (id: PageId) => {
+    switch (id) {
+      case "settings":
+        return <SettingsPage onOpenAbout={() => navigate("about")} />;
+      case "about":
+        return <AboutPage onBack={() => navigate("settings")} />;
+      case "batch":
+        return <BatchPage />;
+      case "video-convert":
+        return <VideoConvertPage />;
+      case "image-convert":
+        return <ImageConvertPage />;
+      case "video-clip":
+        return <VideoClipPage />;
+      case "audio-convert":
+        return <AudioConvertPage />;
+      case "media-info":
+        return <MediaInfoPage />;
+      default:
+        return <VideoConvertPage />;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
-      <AppShell page={page} onNavigate={setPage}>
-        {main}
+      <AppShell page={page} onNavigate={navigate} renderPage={renderPage}>
       </AppShell>
       <FirstRunDialog
         show={showFirstRun}
@@ -108,15 +126,21 @@ function Shell() {
   );
 }
 
-/** 等设置加载完成后再渲染应用；并把 settings.language 同步给 I18nProvider */
+/** 等设置加载完成后再渲染应用；并把持久化的 language 同步给 I18nProvider（仅首次） */
 function Inner() {
   const { settings, loading } = useSettings();
   const { setLang } = useI18n();
+  const syncedRef = useRef(false);
 
-  // settings.language 是语言的唯一真理源（切换入口在设置页下拉，写入 settings）
+  // settings.language 是语言的唯一真理源。首次加载完成时同步一次；
+  // 运行期语言切换已在设置页直接 setLang（同批渲染），此处不再跟随，避免二次渲染闪烁
   useEffect(() => {
-    if (settings) setLang(settings.language);
-  }, [settings?.language, setLang]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (settings && !syncedRef.current) {
+      syncedRef.current = true;
+      setLang(settings.language);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
 
   if (loading && !settings) {
     return (
@@ -127,7 +151,9 @@ function Inner() {
   }
   return (
     <TaskProvider>
-      <Shell />
+      <TabManagerProvider>
+        <Shell />
+      </TabManagerProvider>
       <Toaster position="bottom-right" richColors closeButton />
     </TaskProvider>
   );
