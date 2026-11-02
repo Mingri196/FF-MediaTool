@@ -48,7 +48,7 @@ FF-MediaTool 是一款基于 FFmpeg 的桌面应用，支持音视频及图片�
 # 前置要求
 # - Rust 1.70+
 # - Node.js 18+
-# - FFmpeg 9.0+（在 PATH 中或在设置页配置）
+# - FFmpeg 6.0+（推荐 9.0+；在 PATH 中或在设置页配置）
 
 # 克隆仓库
 git clone https://github.com/Mingri196/FF-MediaTool.git
@@ -115,7 +115,7 @@ FF-MediaTool is a desktop application for audio, video, and image conversion pow
 # Prerequisites
 # - Rust 1.70+
 # - Node.js 18+
-# - FFmpeg 9.0+ (in PATH or configured in Settings)
+# - FFmpeg 6.0+ (9.0+ recommended; in PATH or configured in Settings)
 
 git clone https://github.com/Mingri196/FF-MediaTool.git
 cd FF-MediaTool

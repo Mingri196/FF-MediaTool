@@ -9,7 +9,7 @@ FF-MediaTool is a desktop application for audio, video, and image conversion bas
 ## System Requirements
 
 - Windows 10/11 64-bit
-- FFmpeg 9.0 or later (configurable in Settings)
+- FFmpeg 6.0 or later (9.0+ recommended, configurable in Settings)
 - Memory: 4GB+ recommended
 - Disk space: varies by file size
 
