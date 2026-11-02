@@ -156,7 +156,14 @@ export function FilterSection({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label>{t("filter.rotate")}</Label>
-          <Select value={video.rotate} onValueChange={(v) => set({ rotate: v as RotateMode })}>
+          <Select
+            value={video.rotate}
+            onValueChange={(v) => set({ rotate: v as RotateMode })}
+            items={{
+              none: t("filter.rotate.none"), "90": t("filter.rotate.90"),
+              "180": t("filter.rotate.180"), "270": t("filter.rotate.270"), custom: t("filter.rotate.custom"),
+            }}
+          >
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">{t("filter.rotate.none")}</SelectItem>
@@ -178,7 +185,11 @@ export function FilterSection({
         </div>
         <div className="space-y-1.5">
           <Label>{t("filter.flip")}</Label>
-          <Select value={video.flip} onValueChange={(v) => set({ flip: v as FlipMode })}>
+          <Select
+            value={video.flip}
+            onValueChange={(v) => set({ flip: v as FlipMode })}
+            items={{ none: t("filter.flip.none"), h: t("filter.flip.h"), v: t("filter.flip.v") }}
+          >
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">{t("filter.flip.none")}</SelectItem>

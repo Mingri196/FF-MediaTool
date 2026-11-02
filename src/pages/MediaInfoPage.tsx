@@ -242,7 +242,11 @@ export function MediaInfoPage() {
                   {info.videoStreams.length > 1 && (
                     <div className="flex items-center gap-2">
                       <Label className="text-xs">{t("info.track")}</Label>
-                      <Select value={String(videoIdx)} onValueChange={(v) => v !== null && setVideoIdx(Number(v))}>
+                      <Select
+                        value={String(videoIdx)}
+                        onValueChange={(v) => v !== null && setVideoIdx(Number(v))}
+                        items={Object.fromEntries(info.videoStreams.map((s, i) => [String(i), `#${i} ${s.codecName} ${s.width}×${s.height}`]))}
+                      >
                         <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {info.videoStreams.map((s, i) => (
@@ -291,7 +295,11 @@ export function MediaInfoPage() {
                   {info.audioStreams.length > 1 && (
                     <div className="flex items-center gap-2">
                       <Label className="text-xs">{t("info.track")}</Label>
-                      <Select value={String(audioIdx)} onValueChange={(v) => v !== null && setAudioIdx(Number(v))}>
+                      <Select
+                        value={String(audioIdx)}
+                        onValueChange={(v) => v !== null && setAudioIdx(Number(v))}
+                        items={Object.fromEntries(info.audioStreams.map((s, i) => [String(i), `#${i} ${s.codecName} ${s.sampleRate}Hz`]))}
+                      >
                         <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {info.audioStreams.map((s, i) => (

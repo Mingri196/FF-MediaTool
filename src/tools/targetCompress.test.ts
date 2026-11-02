@@ -70,4 +70,23 @@ describe("目标压缩：两遍命令构建", () => {
     expect(args).toContain("-an");
     expect(args).not.toContain("-c:a");
   });
+
+  it("x265 编码器：两遍都用 libx265", () => {
+    const p1 = buildPass1Args({ ...base, encoder: "x265" });
+    const p2 = buildPass2Args({ ...base, encoder: "x265" });
+    expect(p1).toContain("libx265");
+    expect(p2).toContain("libx265");
+    expect(p1).not.toContain("libx264");
+  });
+
+  it("限分辨率：两遍都带 scale=-2:H，且滤镜链一致（pass1/pass2 相同的 -vf 参数）", () => {
+    const p1 = buildPass1Args({ ...base, maxHeight: 720 });
+    const p2 = buildPass2Args({ ...base, maxHeight: 720 });
+    expect(p1).toContain("scale=-2:720");
+    expect(p2).toContain("scale=-2:720");
+  });
+
+  it("不限分辨率：无 -vf 参数", () => {
+    expect(buildPass1Args(base)).not.toContain("-vf");
+  });
 });

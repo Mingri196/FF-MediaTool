@@ -54,8 +54,8 @@ describe("VideoEncodeSection h264_mf（Media Foundation）控件置灰", () => {
     pickCodec(container, "Media Foundation");
 
     const triggers = Array.from(container.querySelectorAll('[data-slot="select-trigger"]'));
-    // 先确认编码器确实切到 h264_mf（Base UI SelectValue 渲染 value）
-    expect(triggers[0]!.textContent).toContain("h264_mf");
+    // 先确认编码器确实切到 h264_mf（items 映射后 SelectValue 渲染的是选中项标签而非原始 value）
+    expect(triggers[0]!.textContent).toContain("H.264 (Media Foundation)");
     // 顺序：编码器(0) preset(1) tune(2) profile(3) level(4) pix_fmt(5)
     expect((triggers[1] as HTMLButtonElement).disabled).toBe(true); // preset 禁用
     expect((triggers[2] as HTMLButtonElement).disabled).toBe(true); // tune 禁用

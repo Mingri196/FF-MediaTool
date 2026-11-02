@@ -66,7 +66,11 @@ export function SettingsPage({ onOpenAbout }: { onOpenAbout?: () => void }) {
             <CardDescription>{t("settings.language.desc")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select value={settings.language} onValueChange={(v) => setLang(v as Language)}>
+            <Select
+              value={settings.language}
+              onValueChange={(v) => setLang(v as Language)}
+              items={{ zh: t("settings.language.zh"), en: t("settings.language.en") }}
+            >
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>

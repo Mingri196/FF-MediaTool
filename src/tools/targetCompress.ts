@@ -6,7 +6,11 @@
  * - 总码率 kbps = 目标字节 × 8 ÷ 1000 ÷ 时长秒
  * - 视频码率 = 总码率 − 音频码率，再留约 2% 容器开销余量
  * - 两遍编码：第 1 遍分析（输出到 null 混流器，无实际文件），第 2 遍按分析数据精准分配码率
+ * - 可选编码器：libx264（快）/ libx265（同体积画质更好，较慢）
+ * - 可选降分辨率：scale=-2:H（宽自适应保持比例），仅当源高于所选值时由调用方传入
  */
+
+export type TargetEncoder = "x264" | "x265";
 
 export interface TargetCompressOptions {
   /** 目标体积（MB），必须 ≥ 1 */
@@ -35,6 +39,11 @@ export function calcVideoBitrateKbps(opts: TargetCompressOptions): number | null
 /** 编码器预设（工具场景用 medium，速度与压缩率均衡） */
 export const TARGET_COMPRESS_PRESET = "medium";
 
+/** 编码器 → ffmpeg 编码器名 */
+export function codecName(encoder: TargetEncoder = "x264"): string {
+  return encoder === "x265" ? "libx265" : "libx264";
+}
+
 /** 目标压缩任务参数（两遍编码 = 队列里先后两个任务） */
 export interface BuildTargetCompressArgsInput {
   input: string;
@@ -44,15 +53,28 @@ export interface BuildTargetCompressArgsInput {
   audioKbps: number;
   /** passlogfile 基路径（ffmpeg 会在其后追加 -0.log 等后缀） */
   passlogPath: string;
+  /** 视频编码器，默认 x264 */
+  encoder?: TargetEncoder;
+  /** 限制最大高度（px）；null/0/undefined = 保持原分辨率 */
+  maxHeight?: number | null;
+}
+
+/** 编码器 + 分辨率 + 码率（两遍共用，保证 pass 1/2 滤镜链一致） */
+function videoArgs(o: BuildTargetCompressArgsInput): string[] {
+  const scale = o.maxHeight && o.maxHeight > 0 ? ["-vf", `scale=-2:${o.maxHeight}`] : [];
+  return [
+    "-c:v", codecName(o.encoder),
+    ...scale,
+    "-preset", TARGET_COMPRESS_PRESET,
+    "-b:v", `${o.videoKbps}k`,
+  ];
 }
 
 /** 第 1 遍：分析（null 混流器丢弃输出，不产生实际文件） */
 export function buildPass1Args(opts: BuildTargetCompressArgsInput): string[] {
   return [
     "-i", opts.input,
-    "-c:v", "libx264",
-    "-preset", TARGET_COMPRESS_PRESET,
-    "-b:v", `${opts.videoKbps}k`,
+    ...videoArgs(opts),
     "-pass", "1",
     "-passlogfile", opts.passlogPath,
     "-an",
@@ -68,9 +90,7 @@ export function buildPass2Args(opts: BuildTargetCompressArgsInput): string[] {
     : ["-an"];
   return [
     "-i", opts.input,
-    "-c:v", "libx264",
-    "-preset", TARGET_COMPRESS_PRESET,
-    "-b:v", `${opts.videoKbps}k`,
+    ...videoArgs(opts),
     "-pass", "2",
     "-passlogfile", opts.passlogPath,
     ...audioArgs,

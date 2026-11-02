@@ -312,7 +312,11 @@ export function VideoConvertPage() {
                 <div className="text-sm font-medium leading-none">
                   <Label>{t("video.format")}</Label>
                 </div>
-                <Select value={format} onValueChange={(v) => v !== null && applyFormat(v)}>
+                <Select
+                  value={format}
+                  onValueChange={(v) => v !== null && applyFormat(v)}
+                  items={Object.fromEntries(VIDEO_FORMATS.map((f) => [f.ext, t(f.label)]))}
+                >
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {VIDEO_FORMATS.map((f) => (

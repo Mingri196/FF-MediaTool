@@ -430,7 +430,11 @@ export function ImageConvertPage() {
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">{t("img.format")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <Select value={params.format} onValueChange={(v) => v !== null && changeFormat(v)}>
+              <Select
+                value={params.format}
+                onValueChange={(v) => v !== null && changeFormat(v)}
+                items={Object.fromEntries(IMAGE_OUTPUT_FORMATS.map((f) => [f, t(`img.format.${f}`)]))}
+              >
                 <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {IMAGE_OUTPUT_FORMATS.map((f) => (<SelectItem key={f} value={f}>{t(`img.format.${f}`)}</SelectItem>))}
@@ -448,7 +452,7 @@ export function ImageConvertPage() {
                 )}
                 {params.format === "jpg" && !isLossless && (
                   <><div className="flex items-center gap-2"><Checkbox id="progressive" checked={params.progressive} onCheckedChange={(v) => setParams({ ...params, progressive: v === true })} /><Label htmlFor="progressive">{t("img.progressive")}</Label></div>
-                    <Select value={params.chromaSampling} onValueChange={(v) => v !== null && setParams({ ...params, chromaSampling: v })}>
+                    <Select value={params.chromaSampling} onValueChange={(v) => v !== null && setParams({ ...params, chromaSampling: v })} items={{ default: "Default", "4:4:4": "4:4:4", "4:2:2": "4:2:2", "4:2:0": "4:2:0" }}>
                       <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="default">Default</SelectItem><SelectItem value="4:4:4">4:4:4</SelectItem><SelectItem value="4:2:2">4:2:2</SelectItem><SelectItem value="4:2:0">4:2:0</SelectItem></SelectContent></Select></>
                 )}
@@ -456,7 +460,7 @@ export function ImageConvertPage() {
                 {params.format === "webp" && <div className="space-y-1.5"><Label>{t("img.webpSpeed")}: {params.webpSpeed}</Label><Slider min={0} max={6} step={1} value={[params.webpSpeed]} onValueChange={(v) => setParams({ ...params, webpSpeed: Math.round(sliderVal(v)) })} /></div>}
                 {params.format === "avif" && <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5"><Label>{t("img.avifSpeed")}: {params.avifSpeed}</Label><Slider min={0} max={8} step={1} value={[params.avifSpeed]} onValueChange={(v) => setParams({ ...params, avifSpeed: Math.round(sliderVal(v)) })} /></div>
-                    <Select value={String(params.avifDepth)} onValueChange={(v) => v !== null && setParams({ ...params, avifDepth: Number(v) as 8 | 10 | 12 })}><SelectTrigger className="w-32"><Label>{t("img.avifDepth")}</Label><SelectValue /></SelectTrigger><SelectContent><SelectItem value="8">8-bit</SelectItem><SelectItem value="10">10-bit</SelectItem></SelectContent></Select></div>}
+                    <Select value={String(params.avifDepth)} onValueChange={(v) => v !== null && setParams({ ...params, avifDepth: Number(v) as 8 | 10 | 12 })} items={{ "8": "8-bit", "10": "10-bit" }}><SelectTrigger className="w-32"><Label>{t("img.avifDepth")}</Label><SelectValue /></SelectTrigger><SelectContent><SelectItem value="8">8-bit</SelectItem><SelectItem value="10">10-bit</SelectItem></SelectContent></Select></div>}
                 {params.format === "gif" && (
                   <div className="space-y-3">
                     {/* 拆分 / 合成模式（互斥；可同时关闭） */}
@@ -494,8 +498,13 @@ export function ImageConvertPage() {
               <div className="space-y-1.5">
                 <Label>{t("img.resizeMode")}</Label>
                 {T(RESIZE_TOOLTIPS[params.resize.mode] ?? "img.tip.none",
-                  <Select value={params.resize.mode} onValueChange={(v) => v !== null && setParams({ ...params, resize: { ...params.resize, mode: v as ImageParams["resize"]["mode"] } })} disabled={disabled}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder={t(`img.resize.${params.resize.mode}`)} /></SelectTrigger>
+                      <Select
+                        value={params.resize.mode}
+                        onValueChange={(v) => v !== null && setParams({ ...params, resize: { ...params.resize, mode: v as ImageParams["resize"]["mode"] } })}
+                        disabled={disabled}
+                        items={Object.fromEntries(RESIZE_MODES.map((m) => [m, t(`img.resize.${m}`)]))}
+                      >
+                        <SelectTrigger className="w-full"><SelectValue placeholder={t(`img.resize.${params.resize.mode}`)} /></SelectTrigger>
                     <SelectContent>
                       {RESIZE_MODES.map((m) => <SelectItem key={m} value={m}>{t(`img.resize.${m}`)}</SelectItem>)}
                     </SelectContent>
@@ -522,7 +531,11 @@ export function ImageConvertPage() {
                   <div className="col-span-2 space-y-1.5">
                     <Label>{t("img.resizeMode")}</Label>
                     {T(RESIZE_TOOLTIPS["adaptNone"] ?? "img.tip.adaptNone",
-                      <Select value={params.resize.adaptMode} onValueChange={(v) => v !== null && setParams({ ...params, resize: { ...params.resize, adaptMode: v as "none" | "fill" | "contain" | "cover" } })}>
+                      <Select
+                        value={params.resize.adaptMode}
+                        onValueChange={(v) => v !== null && setParams({ ...params, resize: { ...params.resize, adaptMode: v as "none" | "fill" | "contain" | "cover" } })}
+                        items={Object.fromEntries(ADAPT_MODES.map((m) => [m, m === "none" ? t("img.resize.none_adapt") : t(`img.resize.${m}`)]))}
+                      >
                         <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {ADAPT_MODES.map((m) => <SelectItem key={m} value={m}>{m === "none" ? t("img.resize.none_adapt") : t(`img.resize.${m}`)}</SelectItem>)}

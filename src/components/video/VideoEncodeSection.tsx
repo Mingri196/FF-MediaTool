@@ -99,6 +99,9 @@ function VideoCard({
             }
             set(patch);
           }}
+          items={Object.fromEntries(
+            codecGroups.flatMap((g) => g.items.map((c) => [c.value, t(c.labelKey as Parameters<typeof t>[0])])),
+          )}
         >
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -211,7 +214,12 @@ function VideoCard({
       {/* 基础参数：preset/tune/profile/level/pix_fmt（h264_mf 不支持，禁用）；fps 保留 */}
       <div className="space-y-1.5">
         <Label>{t("video.presetSpeed")}</Label>
-        <Select value={video.preset} onValueChange={(v) => set({ preset: v as VideoParams["preset"] })} disabled={mfDis}>
+        <Select
+          value={video.preset}
+          onValueChange={(v) => set({ preset: v as VideoParams["preset"] })}
+          disabled={mfDis}
+          items={Object.fromEntries(X264_PRESETS.map((p) => [p, p]))}
+        >
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {X264_PRESETS.map((p) => (
@@ -412,7 +420,11 @@ function AudioCard({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div className="space-y-1.5">
         <Label>{t("video.audioCodec")}</Label>
-        <Select value={audio.acodec} onValueChange={(v) => set({ acodec: v as VideoAudioParams["acodec"] })}>
+        <Select
+          value={audio.acodec}
+          onValueChange={(v) => set({ acodec: v as VideoAudioParams["acodec"] })}
+          items={Object.fromEntries(AUDIO_CODECS.map((c) => [c.value, t(c.labelKey)]))}
+        >
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
             {AUDIO_CODECS.map((c) => (
@@ -435,7 +447,12 @@ function AudioCard({
       </div>
       <div className="space-y-1.5">
         <Label>{t("video.sampleRate")}</Label>
-        <Select value={String(audio.sampleRate || 0)} onValueChange={(v) => set({ sampleRate: Number(v) })} disabled={dis}>
+        <Select
+          value={String(audio.sampleRate || 0)}
+          onValueChange={(v) => set({ sampleRate: Number(v) })}
+          disabled={dis}
+          items={{ "0": t("common.auto"), ...Object.fromEntries([8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 176400, 192000].map((r) => [String(r), `${r} Hz`])) }}
+        >
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="0">{t("common.auto")}</SelectItem>
@@ -447,7 +464,15 @@ function AudioCard({
       </div>
       <div className="space-y-1.5">
         <Label>{t("video.channels")}</Label>
-        <Select value={String(audio.channels || 0)} onValueChange={(v) => set({ channels: Number(v) })} disabled={dis}>
+        <Select
+          value={String(audio.channels || 0)}
+          onValueChange={(v) => set({ channels: Number(v) })}
+          disabled={dis}
+          items={{
+            "0": t("video.channels.auto"), "1": t("video.channels.mono"), "2": t("video.channels.stereo"),
+            "6": t("video.channels.51"), "8": t("video.channels.71"),
+          }}
+        >
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="0">{t("video.channels.auto")}</SelectItem>

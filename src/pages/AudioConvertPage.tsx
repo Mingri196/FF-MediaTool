@@ -486,7 +486,14 @@ export function AudioConvertPage() {
                     {extractTrack && (
                       <div className="flex items-center gap-2">
                         <Label className="w-16 shrink-0 text-xs">{t("audio.track")}</Label>
-                        <Select value={String(trackIndex)} onValueChange={(v) => v !== null && setTrackIndex(Number(v))}>
+                        <Select
+                          value={String(trackIndex)}
+                          onValueChange={(v) => v !== null && setTrackIndex(Number(v))}
+                          items={{
+                            "-1": t("audio.allTracks"),
+                            ...Object.fromEntries(audioStreams.map((s, i) => [String(i), `#${i + 1} ${s.codecName} ${s.channels ? `${s.channels}ch` : ""}`])),
+                          }}
+                        >
                           <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="-1">{t("audio.allTracks")}</SelectItem>
@@ -616,6 +623,7 @@ export function AudioConvertPage() {
                 <Select
                   value={audio.mode}
                   onValueChange={(v) => v !== null && setAudio({ ...audio, mode: v as AudioParams["mode"] })}
+                  items={{ cbr: t("audio.mode.cbr"), vbr: t("audio.mode.vbr"), lossless: t("audio.mode.lossless") }}
                 >
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -651,7 +659,9 @@ export function AudioConvertPage() {
               <div className="space-y-1.5">
                 <Label>{t("audio.sampleRate")}</Label>
                 <Select value={String(audio.sampleRate || 0)}
-                  onValueChange={(v) => v !== null && setAudio({ ...audio, sampleRate: Number(v) })}>
+                  onValueChange={(v) => v !== null && setAudio({ ...audio, sampleRate: Number(v) })}
+                  items={{ "0": t("common.auto"), ...Object.fromEntries(AUDIO_SAMPLE_RATES.map((r) => [String(r), `${r} Hz`])) }}
+                >
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="0">{t("common.auto")}</SelectItem>
@@ -664,7 +674,9 @@ export function AudioConvertPage() {
               <div className="space-y-1.5">
                 <Label>{t("audio.bitDepth")}</Label>
                 <Select value={String(audio.bitDepth || 0)}
-                  onValueChange={(v) => v !== null && setAudio({ ...audio, bitDepth: Number(v) })}>
+                  onValueChange={(v) => v !== null && setAudio({ ...audio, bitDepth: Number(v) })}
+                  items={{ "0": t("common.auto"), ...Object.fromEntries(AUDIO_BIT_DEPTHS.map((b) => [String(b), `${b} bit`])) }}
+                >
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="0">{t("common.auto")}</SelectItem>
@@ -677,7 +689,12 @@ export function AudioConvertPage() {
               <div className="space-y-1.5">
                 <Label>{t("audio.channels")}</Label>
                 <Select value={String(audio.channels || 0)}
-                  onValueChange={(v) => v !== null && setAudio({ ...audio, channels: Number(v) })}>
+                  onValueChange={(v) => v !== null && setAudio({ ...audio, channels: Number(v) })}
+                  items={{
+                    "0": t("video.channels.auto"), "1": t("video.channels.mono"), "2": t("video.channels.stereo"),
+                    "6": t("video.channels.51"), "8": t("video.channels.71"),
+                  }}
+                >
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="0">{t("video.channels.auto")}</SelectItem>
