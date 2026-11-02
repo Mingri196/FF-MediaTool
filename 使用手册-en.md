@@ -4,12 +4,12 @@
 
 ## Introduction
 
-FF-MediaTool is a desktop application for audio, video, and image conversion based on FFmpeg. It supports batch processing, format conversion, and parameter adjustment. Built with Tauri 2 + React, it features a clean and intuitive interface.
+FF-MediaTool is a desktop application for audio, video, and image conversion based on FFmpeg. It supports batch processing, format conversion, and parameter adjustment, with multi-tab management and standalone tools. Built with Tauri 2 + React.
 
 ## System Requirements
 
 - Windows 10/11 64-bit
-- FFmpeg (recommended 6.0+, configurable in Settings)
+- FFmpeg 9.0 or later (configurable in Settings)
 - Memory: 4GB+ recommended
 - Disk space: varies by file size
 
@@ -19,6 +19,8 @@ FF-MediaTool is a desktop application for audio, video, and image conversion bas
 2. Drop or click to select input files
 3. Set output format and parameters
 4. Click "Start" to begin conversion
+
+**Multi-tab:** The tab bar at the top keeps multiple module pages open. Q / E switches tabs, right-click duplicates one, and each tab keeps its own page state and background tasks.
 
 ## Modules
 
@@ -80,7 +82,13 @@ Supports time-based trimming and multi-segment concatenation.
 
 View detailed metadata of audio/video files: codec, resolution, bitrate, framerate, duration, audio tracks, etc.
 
-Supports multi-track switching and information export.
+Files can be previewed in place: videos and audio play on click (with seek and volume), images show directly, and animated GIFs play automatically. Multi-track switching and information export are supported.
+
+### Tools
+
+**Target Compress:** Enter a desired file size (say, 100MB) and the bitrate is calculated automatically; 2-pass encoding lands close to the target. Encoder (H.264·x264 / H.265·x265), audio handling, and a resolution limit are optional.
+
+**Video Screenshots:** Click the timeline to add screenshot points (manual timestamp input works too) and export high-quality stills in batch. JPG / PNG / WebP, quality, resolution limit, and naming by timestamp or sequence number are all optional.
 
 ### Batch Tasks
 
@@ -88,7 +96,6 @@ View and manage all running and completed tasks.
 
 **Features:**
 - View task progress and status
-- Pause/resume tasks
 - Stop tasks
 - Delete completed tasks
 - View task logs
@@ -106,6 +113,8 @@ View and manage all running and completed tasks.
 1. Manual edit in the module page (current task only)
 2. Custom path in Settings for the corresponding module
 3. Global default opt directory
+
+Standalone tools archive their output automatically into a subfolder named after the input file, inside the opt directory.
 
 ## FAQ
 

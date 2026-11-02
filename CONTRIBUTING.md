@@ -61,7 +61,7 @@ cargo test --lib     # 在 src-tauri/ 目录下
 npx tsc --noEmit
 
 # 4. 前端单元测试（vitest）
-npx vitest run
+npm test
 
 # 4b. 只跑某个测试文件（开发时快速验证）
 npx vitest run src/video/builder.test.ts

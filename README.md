@@ -35,8 +35,9 @@ FF-MediaTool 是一款基于 FFmpeg 的桌面应用，支持音视频及图片�
 - **音频转换** — MP3、AAC、FLAC、WAV、OGG 等格式互转，支持码率、采样率、声道调整
 - **图片转换** — JPG、PNG、WebP、AVIF 等格式批量转换，支持尺寸调整、旋转/裁剪/色彩编辑、GIF 拆分/合成
 - **视频剪辑** — 时间裁剪、多片段拼接
-- **媒体信息** — 查看音视频文件详细元数据，支持多流切换
+- **媒体信息** — 查看音视频文件详细元数据，支持多流切换，可直接预览媒体文件
 - **批量任务** — 队列管理、进度查看、实时日志
+- **独立工具** — 目标压缩（按目标体积自动算码率、两遍编码）、视频截图（时间轴点选批量导帧）
 - **多标签** — 内部功能页多标签管理，各标签独立保存页面状态与后台任务，Q/E 快捷键切换、右键复制、悬停预览
 - **硬件监控** — 标题栏实时显示 GPU / CPU / 内存占用
 - **主题** — 浅色/深色/跟随系统
@@ -101,8 +102,9 @@ FF-MediaTool is a desktop application for audio, video, and image conversion pow
 - **Audio Convert** — Format conversion between MP3, AAC, FLAC, WAV, OGG, etc. Bitrate, sample rate, channel adjustment
 - **Image Convert** — Batch conversion between JPG, PNG, WebP, AVIF, etc. Resize, rotate, crop, color editing, GIF split/combine
 - **Video Clip** — Time-based trimming, multi-segment concatenation
-- **Media Info** — View detailed media metadata, multi-track switching
+- **Media Info** — View detailed media metadata with multi-track switching and in-place media preview
 - **Batch Tasks** — Queue management, progress tracking, real-time logs
+- **Standalone Tools** — Target Compress (auto bitrate from target size, 2-pass encoding) and Video Screenshots (pick timestamps on the timeline, batch-export stills)
 - **Multi-Tab** — Multi-tab management for internal pages; each tab keeps its own page state and background tasks, Q/E hotkey switching, right-click duplicate, hover preview
 - **Hardware Monitor** — Real-time GPU / CPU / memory usage in the title bar
 - **Theme** — Light / Dark / System
