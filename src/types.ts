@@ -10,7 +10,8 @@ export type PageId =
   | "media-info"
   | "batch"
   | "settings"
-  | "about";
+  | "about"
+  | "tools";
 
 export interface EncoderPreset {
   id: string;

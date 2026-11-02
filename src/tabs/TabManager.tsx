@@ -61,6 +61,7 @@ const PAGE_TITLE: Record<PageId, I18nKey> = {
   batch: "nav.batch",
   settings: "nav.settings",
   about: "nav.settings",
+  tools: "nav.tools",
 };
 
 export function TabManagerProvider({ children }: { children: ReactNode }) {

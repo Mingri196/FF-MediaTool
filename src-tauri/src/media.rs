@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::ffmpeg::silent_cmd;
 use crate::settings;
@@ -270,6 +270,15 @@ pub async fn media_probe_full(app: AppHandle, path: String) -> MediaFullInfo {
         }
     }
     MediaFullInfo { ok: true, error: None, format: format_info, video_streams, audio_streams, metadata }
+}
+
+/// 授权单个文件路径给 asset 协议（媒体预览用）：允许前端通过 convertFileSrc 加载任意本地媒体文件。
+/// 预览属于用户显式选择文件后的行为，逐文件授权比全局放开作用域更安全。
+#[tauri::command]
+pub fn allow_preview_file(app: AppHandle, path: String) -> Result<(), String> {
+    app.asset_protocol_scope()
+        .allow_file(&path)
+        .map_err(|e| e.to_string())
 }
 
 fn error_result(msg: &str) -> MediaFullInfo {

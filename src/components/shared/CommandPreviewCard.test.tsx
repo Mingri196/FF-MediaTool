@@ -170,4 +170,12 @@ describe("tokenizeArgs / normalizeUserArgs", () => {
   it("normalizeUserArgs 去掉 ffmpeg 前缀", () => {
     expect(normalizeUserArgs("ffmpeg -y -i in.mp4 out.mp4")).toEqual(["-y", "-i", "in.mp4", "out.mp4"]);
   });
+  it("Windows 路径的单反斜杠不被吞（转义仅对引号/反斜杠/空白生效）", () => {
+    expect(tokenizeArgs("-i D:\\a\\b.mp4")).toEqual(["-i", "D:\\a\\b.mp4"]);
+    expect(tokenizeArgs('-passlogfile "D:\\out\\v.mp4.passlog"')).toEqual([
+      "-passlogfile", "D:\\out\\v.mp4.passlog",
+    ]);
+    // 双反斜杠仍折叠为单个（显式转义）
+    expect(tokenizeArgs("D:\\\\a.mp4")).toEqual(["D:\\a.mp4"]);
+  });
 });

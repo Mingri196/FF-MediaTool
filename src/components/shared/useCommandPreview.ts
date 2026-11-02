@@ -7,14 +7,22 @@ export function tokenizeArgs(cmd: string): string[] {
   let inS = false;
   let inD = false;
   let esc = false;
-  for (const ch of cmd) {
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
     if (esc) {
       cur += ch;
       esc = false;
       continue;
     }
     if (ch === "\\") {
-      esc = true;
+      const next = cmd[i + 1] ?? "";
+      // 反斜杠仅在转义引号/反斜杠/空白时生效，其余保留原样
+      // （Windows 路径 D:\a\b.mp4 中的单反斜杠不被吞掉）
+      if (next === '"' || next === "'" || next === "\\" || next === " " || next === "\t") {
+        esc = true;
+        continue;
+      }
+      cur += ch;
       continue;
     }
     if (ch === "'" && !inD) {

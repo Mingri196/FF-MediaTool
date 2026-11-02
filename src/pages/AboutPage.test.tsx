@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, fireEvent, cleanup } from "@testing-library/react";
-import { AboutPage, GITHUB_URL, MIT_LICENSE_URL, APP_VERSION } from "./AboutPage";
+import { AboutPage, GITHUB_URL, MIT_LICENSE_URL } from "./AboutPage";
 
 const openUrlMock = vi.fn();
 
@@ -13,16 +13,22 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: async (url: string) => openUrlMock(url),
 }));
 
+// 运行时版本号由 Tauri API 提供（构建时 tauri.conf.json 从 package.json 读取）
+vi.mock("@tauri-apps/api/app", () => ({
+  getVersion: async () => "0.88.0",
+}));
+
 afterEach(() => cleanup());
 beforeEach(() => openUrlMock.mockClear());
 
 const renderAbout = (onBack = vi.fn()) => render(<AboutPage onBack={onBack} />);
 
 describe("AboutPage 关于详细页", () => {
-  it("展示软件大标题、动态版本号、技术栈说明", () => {
-    const { getByText } = renderAbout();
+  it("展示软件大标题、动态版本号、技术栈说明", async () => {
+    const { getByText, findByText } = renderAbout();
     expect(getByText("FF-MediaTool")).not.toBeNull();
-    expect(getByText(APP_VERSION)).not.toBeNull();
+    // 版本号运行时从 Tauri API 读取（getVersion mock 返回 0.88.0），展示带 Beta 后缀
+    expect(await findByText("v0.88.0 Beta")).not.toBeNull();
     expect(getByText("about.stackLine")).not.toBeNull();
     expect(getByText("about.versionLine")).not.toBeNull();
   });
@@ -62,7 +68,9 @@ describe("AboutPage 关于详细页", () => {
     expect(onBack).toHaveBeenCalled();
   });
 
-  it("版本常量与页面展示一致（v0.87 Beta）", () => {
-    expect(APP_VERSION).toBe("v0.87 Beta");
+  it("版本号运行时读取并带 Beta 后缀（v0.88.0 Beta，不再硬编码）", async () => {
+    const { findByText } = renderAbout();
+    // package.json 是唯一版本来源 → tauri.conf.json → getVersion() → 页面展示
+    expect(await findByText("v0.88.0 Beta")).not.toBeNull();
   });
 });

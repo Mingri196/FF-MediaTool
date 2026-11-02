@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import gsap from "gsap";
 import {
   Clapperboard,
   Film,
@@ -8,6 +9,7 @@ import {
   Scissors,
   Settings,
   AudioLines,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
@@ -25,7 +27,7 @@ import type { PageId } from "@/types";
 export const NAV_ITEMS: {
   id: PageId;
   icon: typeof Film;
-  labelKey: "nav.videoConvert" | "nav.audioConvert" | "nav.imageConvert" | "nav.videoClip" | "nav.mediaInfo" | "nav.batch" | "nav.settings";
+  labelKey: "nav.videoConvert" | "nav.audioConvert" | "nav.imageConvert" | "nav.videoClip" | "nav.mediaInfo" | "nav.batch" | "nav.settings" | "nav.tools";
 }[] = [
   { id: "video-convert", icon: Film, labelKey: "nav.videoConvert" },
   { id: "audio-convert", icon: AudioLines, labelKey: "nav.audioConvert" },
@@ -33,6 +35,7 @@ export const NAV_ITEMS: {
   { id: "video-clip", icon: Scissors, labelKey: "nav.videoClip" },
   { id: "media-info", icon: ListVideo, labelKey: "nav.mediaInfo" },
   { id: "batch", icon: LayoutGrid, labelKey: "nav.batch" },
+  { id: "tools", icon: Wrench, labelKey: "nav.tools" },
   { id: "settings", icon: Settings, labelKey: "nav.settings" },
 ];
 
@@ -42,6 +45,121 @@ export interface AppShellProps {
   /** 按页面 id 渲染页面内容（PageStack 内部按需调用并缓存） */
   renderPage: (page: PageId) => ReactNode;
 }
+
+/** 图标 hover 动画复位：清掉 GSAP 施加的全部 transform */
+function resetIcon(el: Element) {
+  gsap.set(el, { x: 0, y: 0, scale: 1, scaleY: 1, rotation: 0, transformOrigin: "50% 50%" });
+}
+
+/** 侧边栏每个图标独特的 GSAP hover 动画（key = 导航项 id，各不相同） */
+const ICON_HOVER_ANIMS: Record<string, (el: Element) => void> = {
+  // 胶片：左右轻摇（钟摆）
+  "video-convert": (el) => {
+    gsap.fromTo(
+      el,
+      { rotation: 0, transformOrigin: "50% 50%" },
+      {
+        rotation: 7,
+        duration: 0.12,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        onComplete: () => resetIcon(el),
+      },
+    );
+  },
+  // 音轨：纵向波形脉冲（模拟声波跳动）
+  "audio-convert": (el) => {
+    gsap.fromTo(
+      el,
+      { scaleY: 1, transformOrigin: "50% 50%" },
+      {
+        scaleY: 0.6,
+        duration: 0.14,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        onComplete: () => resetIcon(el),
+      },
+    );
+  },
+  // 图片：弹性放大聚焦
+  "image-convert": (el) => {
+    gsap.fromTo(
+      el,
+      { scale: 0.85, transformOrigin: "50% 50%" },
+      {
+        scale: 1.1,
+        duration: 0.45,
+        ease: "back.out(2.2)",
+        onComplete: () => resetIcon(el),
+      },
+    );
+  },
+  // 剪刀：开合剪两下
+  "video-clip": (el) => {
+    const tl = gsap.timeline({ onComplete: () => resetIcon(el) });
+    tl.fromTo(
+      el,
+      { rotation: 0, transformOrigin: "50% 50%" },
+      { rotation: -35, duration: 0.12, ease: "power2.out" },
+    )
+      .to(el, { rotation: 35, duration: 0.16, ease: "power2.inOut" })
+      .to(el, { rotation: 0, duration: 0.12, ease: "power2.out" });
+  },
+  // 视频列表：从左侧弹性滑入
+  "media-info": (el) => {
+    gsap.fromTo(
+      el,
+      { x: -12, transformOrigin: "50% 50%" },
+      {
+        x: 0,
+        duration: 0.55,
+        ease: "elastic.out(1, 0.45)",
+        onComplete: () => resetIcon(el),
+      },
+    );
+  },
+  // 批量网格：旋转成菱形再回弹
+  batch: (el) => {
+    gsap.fromTo(
+      el,
+      { rotation: 0, transformOrigin: "50% 50%" },
+      {
+        rotation: 45,
+        duration: 0.5,
+        ease: "back.out(1.7)",
+        onComplete: () => resetIcon(el),
+      },
+    );
+  },
+  // 扳手：拧转 360° 弹性
+  tools: (el) => {
+    gsap.fromTo(
+      el,
+      { rotation: 0, transformOrigin: "50% 50%" },
+      {
+        rotation: 360,
+        duration: 0.7,
+        ease: "elastic.out(1, 0.45)",
+        onComplete: () => resetIcon(el),
+      },
+    );
+  },
+  // 齿轮：转动一圈
+  settings: (el) => {
+    gsap.fromTo(
+      el,
+      { rotation: 0, transformOrigin: "50% 50%" },
+      {
+        rotation: 360,
+        duration: 0.6,
+        ease: "power2.out",
+        onComplete: () => resetIcon(el),
+      },
+    );
+  },
+};
 
 export function AppShell({ page, onNavigate, renderPage }: AppShellProps) {
   const { t } = useI18n();
@@ -234,6 +352,7 @@ export function AppShell({ page, onNavigate, renderPage }: AppShellProps) {
   // 竖条作为独立绝对定位元素，用 translateY 移动，避免触发布局
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const indicatorRef = useRef<HTMLDivElement>(null);
   const [indicator, setIndicator] = useState({ top: 0, height: 0 });
   // 初始化加载时不播移动动画，只有切换菜单才动画
   const [ready, setReady] = useState(false);
@@ -250,12 +369,20 @@ export function AppShell({ page, onNavigate, renderPage }: AppShellProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 切换菜单：播放平滑移动动画
+  // 切换菜单：GSAP 弹性动画驱动指示条（back.out 回弹），比 CSS transition 更顺滑
   useEffect(() => {
     if (!ready) return;
     const btn = itemRefs.current.get(page);
-    if (btn) {
+    const bar = indicatorRef.current;
+    if (btn && bar) {
       setIndicator({ top: btn.offsetTop, height: btn.offsetHeight });
+      gsap.to(bar, {
+        y: btn.offsetTop,
+        height: btn.offsetHeight,
+        duration: 0.45,
+        ease: "back.out(1.4)",
+        overwrite: "auto",
+      });
     }
   }, [page, ready]);
 
@@ -316,23 +443,36 @@ export function AppShell({ page, onNavigate, renderPage }: AppShellProps) {
 
         {/* 导航项（relative 容器，指示条在此定位） */}
         <div ref={listRef} className="relative flex-1 overflow-y-auto py-2">
-          {/* 选中指示条（平滑移动，280ms ease-out） */}
+          {/* 选中指示条（GSAP 弹性动画驱动，back.out 回弹） */}
           <div
+            ref={indicatorRef}
             aria-hidden
             className="pointer-events-none absolute left-0 w-0.5 rounded-r bg-primary"
             style={{
               top: 0,
               height: indicator.height,
               transform: `translateY(${indicator.top}px)`,
-              transition: ready
-                ? "transform 280ms cubic-bezier(0, 0, 0.2, 1)"
-                : "none",
             }}
           />
 
           {items.map((item) => {
             const Icon = item.icon;
             const active = page === item.id;
+            // 每个图标独立的 GSAP hover 动画（查表）；快速反复悬停时先 kill 再播
+            const playHover = (e: React.MouseEvent<HTMLButtonElement>) => {
+              const el = e.currentTarget.querySelector("svg");
+              if (!el) return;
+              const anim = ICON_HOVER_ANIMS[item.id];
+              if (!anim) return;
+              gsap.killTweensOf(el);
+              anim(el);
+            };
+            const stopHover = (e: React.MouseEvent<HTMLButtonElement>) => {
+              const el = e.currentTarget.querySelector("svg");
+              if (!el) return;
+              gsap.killTweensOf(el);
+              resetIcon(el);
+            };
             return (
               <button
                 key={item.id}
@@ -341,6 +481,8 @@ export function AppShell({ page, onNavigate, renderPage }: AppShellProps) {
                 }}
                 type="button"
                 onClick={() => onNavigate(item.id)}
+                onMouseEnter={playHover}
+                onMouseLeave={stopHover}
                 className={cn(
                   "group flex w-full items-center gap-3 border-l-2 px-3 py-2.5 text-sm transition-colors hover:bg-accent",
                   active
@@ -350,11 +492,10 @@ export function AppShell({ page, onNavigate, renderPage }: AppShellProps) {
                 title={collapsed ? t(item.labelKey) : undefined}
               >
                 {/* 图标：颜色跟随全局强调色（--primary），选中全不透明、未选中半透；
-                 hover 时小幅缩放 + 轻微透明度变化，220ms 平滑过渡（仅悬浮触发） */}
+                 hover 动效全部由 GSAP 按图标各自驱动（transform 由 GSAP inline 控制，不叠加 CSS 动画） */}
                 <Icon
                   className={cn(
-                    "size-5 shrink-0 text-primary transition-[transform,opacity] duration-[220ms] ease-out",
-                    "group-hover:scale-[1.08] group-hover:opacity-80",
+                    "size-5 shrink-0 text-primary transition-opacity duration-[220ms] ease-out",
                     active ? "opacity-100" : "opacity-50",
                   )}
                 />

@@ -99,3 +99,9 @@ pub fn validate_task_args(input: String, output: String, vcodec: Option<String>,
 
     ValidationResult { errors, warnings }
 }
+/// 确保目录存在（递归创建）。
+/// 目标压缩等独立工具在添加任务前，于 opt 目录内建立以输入文件命名的专属输出子目录。
+#[tauri::command]
+pub fn ensure_dir(path: String) -> Result<(), String> {
+    std::fs::create_dir_all(&path).map_err(|e| format!("创建目录失败: {e}"))
+}

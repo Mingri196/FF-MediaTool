@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { Copy, Download, Pencil, FileVideo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,10 +27,27 @@ import { useTasks } from "@/tasks/TaskProvider";
 import { api } from "@/lib/tauri";
 import { DropZone } from "@/components/shared/DropZone";
 import { FileRow } from "@/components/shared/FileRow";
-import { basename, formatMs } from "@/lib/format";
+import { basename, formatMs, formatMsPrecise } from "@/lib/format";
 import type { MediaFullInfo } from "@/types";
 
 type InfoTab = "format" | "video" | "audio";
+type PreviewKind = "video" | "audio" | "image";
+
+/** 图片后缀（含动图 GIF，用 <img> 预览可播放动画） */
+const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "ico", "avif", "svg"]);
+/** 音频后缀 */
+const AUDIO_EXTS = new Set(["mp3", "wav", "flac", "aac", "m4a", "ogg", "opus", "wma", "aiff", "alac", "ape"]);
+
+/** 依据扩展名 + 流信息判定预览类型 */
+function detectPreviewKind(input: string, info: MediaFullInfo): PreviewKind {
+  const ext = input.split(".").pop()?.toLowerCase() ?? "";
+  if (IMAGE_EXTS.has(ext)) return "image";
+  if (AUDIO_EXTS.has(ext)) return "audio";
+  // 视频 / 音频容器（如 webm/mkv/mp4）按流判定：有视频流 → 视频，否则有音频流 → 音频
+  if (info.videoStreams.length > 0) return "video";
+  if (info.audioStreams.length > 0) return "audio";
+  return "image";
+}
 
 function fmtSize(bytes: number): string {
   const kb = bytes / 1024;
@@ -65,6 +83,7 @@ export function MediaInfoPage() {
   const [audioIdx, setAudioIdx] = useState(0);
   const [metaOpen, setMetaOpen] = useState(false);
   const [metaEdit, setMetaEdit] = useState<Record<string, string>>({});
+  const [previewKind, setPreviewKind] = useState<PreviewKind | null>(null);
 
   /** 选文件 → 全量探测 */
   const pickInput = useCallback(async (path?: string) => {
@@ -84,9 +103,13 @@ export function MediaInfoPage() {
       setAudioIdx(0);
       setMetaEdit({ ...full.metadata });
       setTab("format");
+      // 授权 asset 协议访问该文件，供预览加载
+      void api.allowPreviewFile(picked).catch((e) => console.error(e));
+      setPreviewKind(detectPreviewKind(picked, full));
     } catch (e) {
       console.error(e);
       setInfo(null);
+      setPreviewKind(null);
     } finally {
       setLoading(false);
     }
@@ -190,7 +213,7 @@ export function MediaInfoPage() {
                 <CardContent>
                   <InfoTable rows={[
                     [t("info.formatName"), info.format.formatLongName],
-                    [t("info.duration"), formatMs(Math.round(info.format.duration * 1000))],
+                    [t("info.duration"), formatMsPrecise(Math.round(info.format.duration * 1000))],
                     [t("info.fileSize"), fmtSize(info.format.size)],
                     [t("info.bitrate"), fmtBitrate(info.format.bitRate ? Math.round(info.format.bitRate / 1000) : null)],
                     [t("info.nbStreams"), String(info.format.nbStreams)],
@@ -250,7 +273,7 @@ export function MediaInfoPage() {
                       [t("info.sar"), currentVideo.sampleAspectRatio || "—"],
                       [t("info.dar"), currentVideo.displayAspectRatio || "—"],
                       [t("info.fieldOrder"), currentVideo.fieldOrder],
-                      [t("info.duration"), formatMs(Math.round(currentVideo.duration * 1000))],
+                      [t("info.duration"), formatMsPrecise(Math.round(currentVideo.duration * 1000))],
                     ]} />
                   )}
                 </CardContent>
@@ -289,8 +312,36 @@ export function MediaInfoPage() {
                       [t("info.bitrate"), fmtBitrate(currentAudio.bitRate ? Math.round(currentAudio.bitRate / 1000) : null)],
                       [t("info.maxBitrate"), fmtBitrate(currentAudio.maxBitRate ? Math.round(currentAudio.maxBitRate / 1000) : null)],
                       [t("info.nbFrames"), currentAudio.nbFrames !== null ? String(currentAudio.nbFrames) : "—"],
-                      [t("info.duration"), formatMs(Math.round(currentAudio.duration * 1000))],
+                      [t("info.duration"), formatMsPrecise(Math.round(currentAudio.duration * 1000))],
                     ]} />
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 媒体预览（选择文件后显示，视频/音频可点击播放） */}
+            {previewKind && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("info.preview")}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex justify-center">
+                  {previewKind === "image" && (
+                    <img
+                      src={convertFileSrc(input)}
+                      alt={basename(input)}
+                      className="max-h-[420px] max-w-full rounded-md object-contain"
+                    />
+                  )}
+                  {previewKind === "video" && (
+                    <video
+                      controls
+                      src={convertFileSrc(input)}
+                      className="max-h-[420px] max-w-full rounded-md"
+                    />
+                  )}
+                  {previewKind === "audio" && (
+                    <audio controls src={convertFileSrc(input)} className="w-full" />
                   )}
                 </CardContent>
               </Card>
@@ -376,7 +427,7 @@ function formatText(info: MediaFullInfo): string {
   const lines: string[] = [];
   lines.push(`=== ${info.format.formatLongName} ===`);
   lines.push(`File: ${info.format.filename}`);
-  lines.push(`Duration: ${formatMs(Math.round(info.format.duration * 1000))}`);
+  lines.push(`Duration: ${formatMsPrecise(Math.round(info.format.duration * 1000))}`);
   lines.push(`Size: ${fmtSize(info.format.size)}`);
   if (info.format.bitRate) lines.push(`Bitrate: ${fmtBitrate(Math.round(info.format.bitRate / 1000))}`);
   lines.push("");
@@ -384,7 +435,7 @@ function formatText(info: MediaFullInfo): string {
     lines.push(`--- Video Stream #${vs.index} ---`);
     lines.push(`Codec: ${vs.codecName} (${vs.codecLongName})`);
     lines.push(`Resolution: ${vs.width}x${vs.height}, Pixel Format: ${vs.pixFmt}`);
-    lines.push(`FPS: ${fmtFps(vs.avgFrameRate)}, Duration: ${formatMs(Math.round(vs.duration * 1000))}`);
+    lines.push(`FPS: ${fmtFps(vs.avgFrameRate)}, Duration: ${formatMsPrecise(Math.round(vs.duration * 1000))}`);
     lines.push(`Profile: ${vs.profile}, Level: ${vs.level}, B-Frames: ${vs.hasBFrames}, Refs: ${vs.refs}`);
     if (vs.bitRate) lines.push(`Bitrate: ${fmtBitrate(Math.round(vs.bitRate / 1000))}`);
     lines.push("");

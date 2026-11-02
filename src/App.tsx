@@ -9,6 +9,7 @@ import { VideoClipPage } from "@/pages/VideoClipPage";
 import { AudioConvertPage } from "@/pages/AudioConvertPage";
 import { MediaInfoPage } from "@/pages/MediaInfoPage";
 import { ImageConvertPage } from "@/pages/ImageConvertPage";
+import { ToolsPage } from "@/pages/ToolsPage";
 import { FirstRunDialog } from "@/components/ffmpeg/FirstRunDialog";
 import { I18nProvider, useI18n } from "@/i18n";
 import { SettingsProvider, useSettings } from "@/settings/SettingsProvider";
@@ -107,6 +108,8 @@ function Shell() {
         return <AudioConvertPage />;
       case "media-info":
         return <MediaInfoPage />;
+      case "tools":
+        return <ToolsPage />;
       default:
         return <VideoConvertPage />;
     }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, fireEvent, cleanup } from "@testing-library/react";
+import { render, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { SettingsPage } from "./SettingsPage";
 
 const updateMock = vi.fn();
@@ -8,6 +8,11 @@ let settingsMock: Record<string, unknown> | null = null;
 
 vi.mock("@/i18n", () => ({
   useI18n: () => ({ t: (k: string) => k, setLang: vi.fn() }),
+}));
+
+// 运行时版本号由 Tauri API 提供（构建时 tauri.conf.json 从 package.json 读取）
+vi.mock("@tauri-apps/api/app", () => ({
+  getVersion: async () => "0.88.0",
 }));
 
 vi.mock("@/settings/SettingsProvider", () => ({
@@ -71,13 +76,14 @@ describe("SettingsPage 关于本应用板块", () => {
     expect(aboutCard!.textContent).toContain("settings.about.desc");
   });
 
-  it("板块展示动态版本号与技术栈", () => {
+  it("板块展示动态版本号与技术栈", async () => {
     settingsMock = baseSettings();
     const { container } = render(<SettingsPage />);
     const aboutCard = Array.from(container.querySelectorAll("[data-slot=card]")).find(
       (c) => c.textContent?.includes("settings.about.title"),
     )!;
-    expect(aboutCard.textContent).toContain("v0.87 Beta");
+    // 版本号运行时从 Tauri API 异步读取（getVersion mock 返回 0.88.0）
+    await waitFor(() => expect(aboutCard.textContent).toContain("v0.88.0 Beta"));
     expect(aboutCard.textContent).toContain("Tauri 2 + React + Rust");
   });
 
@@ -89,18 +95,17 @@ describe("SettingsPage 关于本应用板块", () => {
     expect(onOpenAbout).toHaveBeenCalled();
   });
 
-  it("页面底部水印已移除：不再渲染左下角版本号与右下角技术栈", () => {
+  it("页面底部水印已移除：不再渲染左下角版本号与右下角技术栈", async () => {
     settingsMock = baseSettings();
     const { container } = render(<SettingsPage />);
-    const body = container.textContent ?? "";
     // 页脚水印是「FF-MediaTool v…Beta」+ Badge，属于页面底部独立行；
-    // 删除后 body 不应再包含品牌版本水印（任何版本号都能捕获），关于板块内的 v0.76 不受影响
-    expect(body).not.toContain("FF-MediaTool v");
+    // 删除后 body 不应再包含品牌版本水印（任何版本号都能捕获），关于板块内的版本号不受影响
+    expect(container.textContent ?? "").not.toContain("FF-MediaTool v");
     // 关于板块仍在（仅动态版本 + 技术栈两行 + 按钮，无页脚水印）
     const aboutCard = Array.from(container.querySelectorAll("[data-slot=card]")).find(
       (c) => c.textContent?.includes("settings.about.title"),
           )!;
-          expect(aboutCard.textContent).toContain("v0.87 Beta");
+          await waitFor(() => expect(aboutCard.textContent).toContain("v0.88.0 Beta"));
         });
 
         it("重置设置：面板效果恢复默认「模糊效果」", () => {

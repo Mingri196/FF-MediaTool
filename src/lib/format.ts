@@ -10,6 +10,20 @@ export function formatMs(ms: number): string {
   return `${mm}:${ss}`;
 }
 
+/** 毫秒 → 时长字符串，保留亚秒精度（GIF 等短时长媒体不会显示成 00:00）。
+ *  例：300ms → "00:00.300"；1500ms → "00:01.500"；整秒则不带小数。 */
+export function formatMsPrecise(ms: number): string {
+  const total = Math.max(0, Math.floor(ms));
+  const h = Math.floor(total / 3600000);
+  const m = Math.floor((total % 3600000) / 60000);
+  const s = Math.floor((total % 60000) / 1000);
+  const frac = total % 1000;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  const base = h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  return frac === 0 ? base : `${base}.${String(frac).padStart(3, "0")}`;
+}
+
 /** 文件大小字节 → 可读字符串 */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

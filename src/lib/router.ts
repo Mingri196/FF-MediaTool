@@ -11,6 +11,7 @@ export const ROUTE_PAGES: PageId[] = [
   "batch",
   "settings",
   "about",
+  "tools",
 ];
 
 const DEFAULT_PAGE: PageId = "settings";

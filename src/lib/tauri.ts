@@ -23,6 +23,8 @@ export const api = {
   mediaProbeBasic: (path: string) => invoke<MediaBasicInfo>("media_probe_basic", { path }),
   /** 全量媒体信息（模块五） */
   mediaProbeFull: (path: string) => invoke<MediaFullInfo>("media_probe_full", { path }),
+  /** 授权媒体文件给 asset 协议（预览用） */
+  allowPreviewFile: (path: string) => invoke<void>("allow_preview_file", { path }),
   /** 去黑边自动检测 */
   detectCrop: (path: string) => invoke<CropDetect>("detect_crop", { path }),
   /** 扫描目录下的全部文件；exts 可选——图片页默认（图片后缀），视频剪辑页传视频后缀 */
@@ -34,6 +36,8 @@ export const api = {
   /** 校验任务参数 */
   validateTaskArgs: (input: string, output: string, vcodec?: string | null, acodec?: string | null, hasVf?: boolean, hasAf?: boolean) =>
     invoke<ValidationResult>("validate_task_args", { input, output, vcodec: vcodec ?? null, acodec: acodec ?? null, hasVf: hasVf ?? false, hasAf: hasAf ?? false }),
+  /** 确保目录存在（递归创建）；目标压缩工具按输入文件建立专属输出子目录 */
+  ensureDir: (path: string) => invoke<void>("ensure_dir", { path }),
 };
 
 export { invoke };

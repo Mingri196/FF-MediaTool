@@ -18,7 +18,7 @@ import {
 import { FfmpegEnvCard } from "@/components/ffmpeg/FfmpegEnvCard";
 import { PresetManagerCard } from "@/components/presets/PresetManagerCard";
 import { CustomBackgroundCard } from "@/components/settings/CustomBackgroundCard";
-import { APP_VERSION } from "@/pages/AboutPage";
+import { useAppVersion } from "@/lib/version";
 import type { Language, ThemeMode } from "@/types";
 
 const THEME_OPTIONS: { value: ThemeMode; labelKey: "settings.appearance.theme.light" | "settings.appearance.theme.dark" | "settings.appearance.theme.system" }[] = [
@@ -31,6 +31,7 @@ const THEME_OPTIONS: { value: ThemeMode; labelKey: "settings.appearance.theme.li
 export function SettingsPage({ onOpenAbout }: { onOpenAbout?: () => void }) {
   const { t, setLang: setI18nLang } = useI18n();
   const { settings, update } = useSettings();
+  const appVersion = useAppVersion();
   const [localPaths, setLocalPaths] = useState(settings?.outputPaths ?? {});
   if (!settings) return null;
 
@@ -253,7 +254,7 @@ export function SettingsPage({ onOpenAbout }: { onOpenAbout?: () => void }) {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{t("settings.about.version")}</span>
-              <span className="font-mono text-xs">{APP_VERSION}</span>
+              <span className="font-mono text-xs">{appVersion}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{t("settings.about.stack")}</span>

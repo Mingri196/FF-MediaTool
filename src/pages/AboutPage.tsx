@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/i18n";
+import { useAppVersion } from "@/lib/version";
 
 export const GITHUB_URL = "https://github.com/Mingri196/FF-MediaTool";
 export const MIT_LICENSE_URL = "https://github.com/Mingri196/FF-MediaTool?tab=MIT-1-ov-file";
-export const APP_VERSION = "v0.87 Beta";
 
 /**
  * 关于详情页：
@@ -18,6 +18,7 @@ export const APP_VERSION = "v0.87 Beta";
  */
 export function AboutPage({ onBack }: { onBack: () => void }) {
   const { t } = useI18n();
+  const appVersion = useAppVersion();
 
   const openRepo = () => void openUrl(GITHUB_URL).catch((e) => console.error(e));
   const openMitLicense = () => void openUrl(MIT_LICENSE_URL).catch((e) => console.error(e));
@@ -39,12 +40,24 @@ export function AboutPage({ onBack }: { onBack: () => void }) {
             <CardTitle className="flex items-center gap-2 text-2xl">
               <Sparkles className="size-5 text-primary" />
               FF-MediaTool
-              <Badge variant="outline">{APP_VERSION}</Badge>
+              {appVersion && <Badge variant="outline">{appVersion}</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p>{t("about.stackLine")}</p>
-            <p>{t("about.versionLine", { version: APP_VERSION })}</p>
+            <p>{t("about.versionLine", { version: appVersion })}</p>
+          </CardContent>
+        </Card>
+
+        {/* 功能简述 */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{t("about.features")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {t("about.featuresDesc")}
+            </p>
           </CardContent>
         </Card>
 
@@ -81,18 +94,6 @@ export function AboutPage({ onBack }: { onBack: () => void }) {
             <Button type="button" variant="outline" size="sm" data-testid="about-mit-link" onClick={openMitLicense}>
               {t("about.mitFull")}
             </Button>
-          </CardContent>
-        </Card>
-
-        {/* 功能简述 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t("about.features")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {t("about.featuresDesc")}
-            </p>
           </CardContent>
         </Card>
       </div>

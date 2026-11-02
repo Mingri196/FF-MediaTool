@@ -93,15 +93,15 @@ describe("AppShell 侧边栏", () => {
     settingsMock = null;
   });
 
-  it("渲染全部 7 个导航项", () => {
+  it("渲染全部 8 个导航项", () => {
     const { container } = render(
       <AppShell page="video-convert" onNavigate={() => {}} renderPage={() => <div>content</div>} />
     );
-    // 7 个导航项 + 1 折叠按钮
-    expect(container.querySelectorAll("nav button").length).toBe(8);
-    // 7 个导航 id 都在 NAV_ITEMS
+    // 8 个导航项 + 1 折叠按钮
+    expect(container.querySelectorAll("nav button").length).toBe(9);
+    // 8 个导航 id 都在 NAV_ITEMS
     const ids = NAV_ITEMS.map((n) => n.id);
-    expect(ids).toHaveLength(7);
+    expect(ids).toHaveLength(8);
   });
 
   it("存在选中指示条元素", () => {
@@ -112,18 +112,20 @@ describe("AppShell 侧边栏", () => {
     expect(indicator).not.toBeNull();
   });
 
-  it("图标带 hover 动画类名（group-hover scale + opacity）", () => {
+  it("图标 hover 动画由 GSAP 驱动（无 CSS 缩放类，transform 交给 GSAP inline）", () => {
     const { container } = render(
       <AppShell page="video-convert" onNavigate={() => {}} renderPage={() => <div>content</div>} />
     );
     const icon = container.querySelector("nav button svg");
     expect(icon).not.toBeNull();
-    expect(icon!.getAttribute("class")).toContain("group-hover:scale-[1.08]");
-    expect(icon!.getAttribute("class")).toContain("group-hover:opacity-80");
-    expect(icon!.getAttribute("class")).toContain("duration-[220ms]");
+    // 不再叠加 CSS hover 缩放类（GSAP 接管 transform）
+    expect(icon!.getAttribute("class")).not.toContain("group-hover:scale");
+    expect(icon!.getAttribute("class")).not.toContain("group-hover:opacity-80");
+    // 透明度过渡保留（选中态控制），transform 由 GSAP 管理
+    expect(icon!.getAttribute("class")).toContain("transition-opacity");
   });
 
-  it("切换菜单后指示条启用平滑移动动画（transition transform 280ms ease-out）", () => {
+  it("切换菜单后指示条位置随激活项更新（GSAP 驱动）", () => {
     // jsdom 不自动执行 rAF，mock 为立即执行以模拟浏览器
     const rafOrig = globalThis.requestAnimationFrame;
     globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => {
@@ -139,26 +141,25 @@ describe("AppShell 侧边栏", () => {
         fireEvent.click(buttons[2]);
       });
       const indicator = container.querySelector('nav div[aria-hidden="true"]');
+      // GSAP 用 inline transform 驱动指示条（不再依赖 CSS transition）
       const style = indicator!.getAttribute("style") || "";
-      expect(style).toContain("transition:");
-      expect(style).toContain("280ms");
-      expect(style).toContain("cubic-bezier(0, 0, 0.2, 1)");
+      expect(style).toContain("transform:");
     } finally {
       globalThis.requestAnimationFrame = rafOrig;
     }
   });
 
-  it("初始化加载时指示条不启用 transition（ready=false → transition:none）", () => {
+  it("初始化加载时指示条不依赖 CSS transition（GSAP 接管）", () => {
     const { container } = render(
       <AppShell page="settings" onNavigate={() => {}} renderPage={() => <div>content</div>} />
     );
     const indicator = container.querySelector('nav div[aria-hidden="true"]');
     const style = indicator!.getAttribute("style") || "";
-    // 首次渲染 ready 尚未置 true，transition 应为 none
-    expect(style).toContain("transition: none");
+    // 指示条样式不再包含 CSS transition 声明
+    expect(style).not.toContain("transition:");
   });
 
-  it("折叠后仍保留 7 个导航项", () => {
+  it("折叠后仍保留 8 个导航项", () => {
     const { container } = render(
       <AppShell page="video-convert" onNavigate={() => {}} renderPage={() => <div>content</div>} />
     );
@@ -168,7 +169,7 @@ describe("AppShell 侧边栏", () => {
     act(() => {
       fireEvent.click(collapseBtn!);
     });
-    expect(container.querySelectorAll("nav button").length).toBe(8);
+    expect(container.querySelectorAll("nav button").length).toBe(9);
   });
 
   it("图标颜色跟随强调色：全部导航图标带 text-primary，激活项不透明、未激活半透", () => {
@@ -178,7 +179,7 @@ describe("AppShell 侧边栏", () => {
     const navButtons = Array.from(container.querySelectorAll("nav button")).filter(
       (b) => b.querySelector("svg"),
     );
-    expect(navButtons.length).toBe(7);
+    expect(navButtons.length).toBe(8);
 
     navButtons.forEach((btn) => {
       const icon = btn.querySelector("svg")!;

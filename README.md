@@ -25,8 +25,6 @@ FF-MediaTool 是一款基于 FFmpeg 的桌面应用，支持音视频及图片�
 
 ### 应用预览
 
-> 将截图放入 `docs/screenshots/` 目录即可显示，支持多张。参考命名：`01-main.png`、`02-video.png`、`03-audio.png` …
-
 <p align="center">
   <img src="docs/screenshots/01-main.png" width="80%" alt="主界面预览" />
 </p>
@@ -42,12 +40,6 @@ FF-MediaTool 是一款基于 FFmpeg 的桌面应用，支持音视频及图片�
 - **多标签** — 内部功能页多标签管理，各标签独立保存页面状态与后台任务，Q/E 快捷键切换、右键复制、悬停预览
 - **硬件监控** — 标题栏实时显示 GPU / CPU / 内存占用
 - **主题** — 浅色/深色/跟随系统
-
-### 下载
-
-[Releases](https://github.com/Mingri196/FF-MediaTool/releases) 页面提供：
-
-- `FF-MediaTool_0.87.0_x64-setup.exe` — Windows 安装版（NSIS 安装包）
 
 ### 从源码构建
 
@@ -99,8 +91,6 @@ FF-MediaTool is a desktop application for audio, video, and image conversion pow
 
 ### Preview
 
-> Drop screenshots into the `docs/screenshots/` directory to display them; multiple images supported. Suggested names: `01-main.png`, `02-video.png`, `03-audio.png` …
-
 <p align="center">
   <img src="docs/screenshots/01-main.png" width="80%" alt="Main UI preview" />
 </p>
@@ -116,12 +106,6 @@ FF-MediaTool is a desktop application for audio, video, and image conversion pow
 - **Multi-Tab** — Multi-tab management for internal pages; each tab keeps its own page state and background tasks, Q/E hotkey switching, right-click duplicate, hover preview
 - **Hardware Monitor** — Real-time GPU / CPU / memory usage in the title bar
 - **Theme** — Light / Dark / System
-
-### Download
-
-The [Releases](https://github.com/Mingri196/FF-MediaTool/releases) page provides:
-
-- `FF-MediaTool_0.87.0_x64-setup.exe` — Windows installer (NSIS)
 
 ### Build from Source
 

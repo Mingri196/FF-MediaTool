@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import gsap from "gsap";
 
 type Phase = "static" | "enter" | "exit";
 
@@ -105,56 +106,41 @@ function SlideLayer({
   onExited?: () => void;
   children: ReactNode;
 }) {
-  // 目标位姿：static → 0；enter → -100% 起步后到 0；exit → 0 起步后到 100%
-  const [entered, setEntered] = useState(phase !== "enter");
+  const ref = useRef<HTMLDivElement>(null);
   const doneRef = useRef(false);
 
+  // GSAP 驱动滑动：enter 从 -100% → 0，exit 0 → 100%，static 无动画
   useEffect(() => {
-    if (phase === "enter") {
-      doneRef.current = false;
-      const raf = requestAnimationFrame(() => setEntered(true));
-      return () => cancelAnimationFrame(raf);
-    }
-    if (phase === "exit") {
-      doneRef.current = false;
-      setEntered(true); // 从 0 起步
-      const raf = requestAnimationFrame(() => setEntered(false)); // 下一帧到 100%
-      return () => cancelAnimationFrame(raf);
-    }
-    // static：无动画
-    setEntered(true);
+    const el = ref.current;
+    if (!el) return;
     doneRef.current = false;
+    if (phase === "static") {
+      gsap.set(el, { x: 0 });
+      return;
+    }
+    const fromX = phase === "enter" ? "-100%" : "0%";
+    const toX = phase === "enter" ? "0%" : "100%";
+    gsap.fromTo(
+      el,
+      { x: fromX },
+      {
+        x: toX,
+        duration: 0.32,
+        ease: phase === "enter" ? "power2.out" : "power2.in",
+        overwrite: "auto",
+        onComplete: () => {
+          if (doneRef.current) return;
+          doneRef.current = true;
+          if (phase === "enter" && onEntered) onEntered();
+          else if (phase === "exit" && onExited) onExited();
+        },
+      },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  const transform =
-    phase === "exit"
-      ? entered
-        ? "translateX(0)"
-        : "translateX(100%)"
-      : entered
-        ? "translateX(0)"
-        : "translateX(-100%)";
-
-  const handleEnd = () => {
-    if (doneRef.current) return;
-    doneRef.current = true;
-    if (phase === "enter" && onEntered) onEntered();
-    else if (phase === "exit" && onExited) onExited();
-  };
-
   return (
-    <div
-      data-page-layer={phase}
-      className="absolute inset-0 will-change-transform"
-      style={{
-        transform,
-        transitionProperty: phase === "static" ? "none" : "transform",
-        transitionDuration: "320ms",
-        transitionTimingFunction: "cubic-bezier(0, 0, 0.2, 1)",
-      }}
-      onTransitionEnd={handleEnd}
-    >
+    <div ref={ref} data-page-layer={phase} className="absolute inset-0 will-change-transform">
       {children}
     </div>
   );
